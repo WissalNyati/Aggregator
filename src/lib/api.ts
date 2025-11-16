@@ -2,8 +2,12 @@
 const DEFAULT_API_URL = 'http://localhost:3001/api';
 
 // Get API URL from environment and ensure it doesn't have trailing slash
-const envApiUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-const API_URL = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
+// If VITE_API_URL doesn't end with /api, add it
+let envApiUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+envApiUrl = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
+
+// Ensure the URL ends with /api
+const API_URL = envApiUrl.endsWith('/api') ? envApiUrl : `${envApiUrl}/api`;
 
 // Debug: Log API URL in development
 if (import.meta.env.DEV) {
