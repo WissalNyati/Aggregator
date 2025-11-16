@@ -1,5 +1,11 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Debug: Log API URL in development
+if (import.meta.env.DEV) {
+  console.log('🔗 API URL:', API_URL);
+  console.log('🌍 Environment:', import.meta.env.MODE);
+}
+
 // Get auth token from localStorage
 function getToken(): string | null {
   return localStorage.getItem('auth_token');
