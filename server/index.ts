@@ -16,7 +16,9 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../.env') });
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// Default port for local development
+const DEFAULT_PORT = 3001;
+const PORT = process.env.PORT || DEFAULT_PORT;
 
 // Configure CORS to allow multiple origins
 const allowedOrigins = process.env.ALLOWED_ORIGINS

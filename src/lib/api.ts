@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Default API URL for local development
+const DEFAULT_API_URL = 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
 // Debug: Log API URL in development
 if (import.meta.env.DEV) {
