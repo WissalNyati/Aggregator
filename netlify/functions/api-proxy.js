@@ -1,5 +1,8 @@
 // Backend API URL - can be overridden with environment variable
-const BACKEND_API_URL = process.env.VITE_API_URL || process.env.BACKEND_API_URL || 'https://physician-search-api-production.up.railway.app';
+// Ensure it doesn't have trailing slash and includes /api
+let backendBaseUrl = process.env.VITE_API_URL || process.env.BACKEND_API_URL || 'https://physician-search-api-production.up.railway.app';
+backendBaseUrl = backendBaseUrl.endsWith('/') ? backendBaseUrl.slice(0, -1) : backendBaseUrl;
+const BACKEND_API_URL = backendBaseUrl.endsWith('/api') ? backendBaseUrl : `${backendBaseUrl}/api`;
 
 // Use CommonJS exports for Netlify functions compatibility
 exports.handler = async (event) => {
@@ -32,7 +35,7 @@ exports.handler = async (event) => {
 
   try {
     // Extract the path from the query string
-    // The function will be called as: /.netlify/functions/api-proxy?path=/api/auth/signin
+    // The function will be called as: /.netlify/functions/api-proxy?path=/auth/signin
     const path = event.queryStringParameters?.path || '/api';
     
     // Ensure path starts with /api

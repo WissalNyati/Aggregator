@@ -2,7 +2,6 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "PORT,CLIENT_URL"
