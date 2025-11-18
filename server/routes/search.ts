@@ -100,15 +100,31 @@ Only return valid JSON, no other text.`;
         const placesResponse = await fetch(
           `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(location)}&key=${process.env.GOOGLE_PLACES_API_KEY}`
         );
-        const placesData = await placesResponse.json();
+        const placesData = await placesResponse.json() as {
+          results?: Array<{
+            name?: string;
+            formatted_address?: string;
+            geometry?: {
+              location?: { lat: number; lng: number };
+            };
+          }>;
+          status?: string;
+          error_message?: string;
+        };
         
         if (placesData.results && placesData.results.length > 0) {
           const place = placesData.results[0];
-          locationData = {
-            name: place.name,
-            formatted_address: place.formatted_address,
-            location: place.geometry?.location,
-          };
+          if (place.name && place.formatted_address) {
+            locationData = {
+              name: place.name,
+              formatted_address: place.formatted_address,
+              location: place.geometry?.location,
+            };
+          }
+        } else if (placesData.status === 'ZERO_RESULTS') {
+          console.log(`No Google Places results found for location: ${location}`);
+        } else if (placesData.error_message) {
+          console.warn(`Google Places API error: ${placesData.error_message}`);
         }
       } catch (error) {
         console.error('Google Places API error:', error);
