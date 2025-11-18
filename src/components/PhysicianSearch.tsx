@@ -17,13 +17,16 @@ interface SearchResult {
     years_experience: number;
   }>;
   resultsCount: number;
-  error?: string;
+  error?: string | null;
+  suggestions?: string[] | null;
+  searchRadius?: number | null;
 }
 
 export function PhysicianSearch() {
   const { user, signOut } = useAuth();
   const { addToHistory } = useSearchHistory();
   const [query, setQuery] = useState('');
+  const [searchRadius, setSearchRadius] = useState(5); // Default 5km
   const [searching, setSearching] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
@@ -38,7 +41,8 @@ export function PhysicianSearch() {
 
     try {
       const { searchApi } = await import('../lib/api');
-      const results = await searchApi.searchPhysicians(query);
+      const radiusInMeters = searchRadius * 1000; // Convert km to meters
+      const results = await searchApi.searchPhysicians(query, radiusInMeters);
 
       // Refresh history (it's automatically saved by the API)
       await addToHistory(
@@ -93,33 +97,46 @@ export function PhysicianSearch() {
 
   const formatResultsText = (results: SearchResult): string => {
     if (results.error) {
-      return `Search Error: ${results.error}
+      let errorText = `Search Error: ${results.error}
 
 Search Query: "${results.query}"
 
-Please try again or contact support if the issue persists.`;
+Search Details:
+- Specialty: ${results.specialty}
+- Location: ${getLocationText(results.location) || 'Not specified'}`;
+
+      if (results.suggestions && results.suggestions.length > 0) {
+        errorText += `\n\nSuggestions:\n${results.suggestions.map(s => `• ${s}`).join('\n')}`;
+      } else {
+        errorText += `\n\nPlease try again or contact support if the issue persists.`;
+      }
+
+      return errorText;
     }
 
     if (results.resultsCount === 0) {
       const locationText = getLocationText(results.location) || 'your area';
+      const radiusText = results.searchRadius ? ` (within ${results.searchRadius / 1000}km)` : '';
       
-      return `No physicians found matching "${results.query}"
+      let noResultsText = `No physicians found matching "${results.query}"
 
 Search Details:
 - Specialty: ${results.specialty}
-- Location: ${locationText}
+- Location: ${locationText}${radiusText}`;
 
-Suggestions to improve your search:
+      if (results.suggestions && results.suggestions.length > 0) {
+        noResultsText += `\n\nSuggestions:\n${results.suggestions.map(s => `• ${s}`).join('\n')}`;
+      } else {
+        noResultsText += `\n\nSuggestions to improve your search:
 • Try a broader location (e.g., "Seattle" instead of "Seattle Downtown")
 • Use more general specialty terms (e.g., "Cardiologist" instead of "Interventional Cardiologist")
 • Remove specific physician names if searching by specialty
 • Try searching by city and state (e.g., "Retina Surgeons in Tacoma, WA")
 • Check spelling of location or specialty names
+• Expand your search radius to include a wider area`;
+      }
 
-You can also try:
-- Searching without location to see all available physicians
-- Using alternative specialty names
-- Expanding your search radius`;
+      return noResultsText;
     }
 
     const resultsText = results.results
@@ -207,6 +224,32 @@ ${resultsText}`;
               </div>
             </div>
 
+            <div>
+              <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-2">
+                Search Radius: {searchRadius} km
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  id="radius"
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={searchRadius}
+                  onChange={(e) => setSearchRadius(Number(e.target.value))}
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  disabled={searching}
+                />
+                <div className="flex gap-2 text-sm text-gray-600">
+                  <span className="w-8 text-center">1km</span>
+                  <span className="w-8 text-center">25km</span>
+                  <span className="w-8 text-center">50km</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Expand the radius to search in a wider area around your location
+              </p>
+            </div>
+
             <button
               type="submit"
               disabled={searching || !query.trim()}
@@ -270,6 +313,17 @@ ${resultsText}`;
                 {formatResultsText(searchResults)}
               </pre>
             </div>
+
+            {searchResults.suggestions && searchResults.suggestions.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-sm font-semibold text-blue-900 mb-2">💡 Suggestions:</h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                  {searchResults.suggestions.map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="mt-4 flex gap-3">
               <button

@@ -12,8 +12,13 @@ const openai = new OpenAI({
 // AI-powered physician search
 searchRoutes.post('/physicians', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { query } = req.body;
+    const { query, radius } = req.body;
     const userId = req.userId!;
+    
+    // Default radius is 5km (5000 meters), max 50km
+    const searchRadius = radius && typeof radius === 'number' && radius > 0 && radius <= 50000 
+      ? radius 
+      : 5000;
 
     if (!query || !query.trim()) {
       return res.status(400).json({ error: 'Search query is required' });
@@ -103,6 +108,9 @@ Only return valid JSON, no other text.`;
       years_experience: number;
     }> = [];
     let locationData = null;
+    let locationError: string | null = null;
+    let noDoctorsFound = false;
+    let apiError: string | null = null;
 
     // If location is specified, search for real doctors using Google Places API
     if (location && process.env.GOOGLE_PLACES_API_KEY) {
@@ -133,7 +141,7 @@ Only return valid JSON, no other text.`;
           // Step 2: Search for doctors near location
           const searchKeyword = specialty !== 'General Practice' ? specialty : 'doctor';
           const placesResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=5000&type=doctor&keyword=${encodeURIComponent(searchKeyword)}&key=${process.env.GOOGLE_PLACES_API_KEY}`
+            `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${searchRadius}&type=doctor&keyword=${encodeURIComponent(searchKeyword)}&key=${process.env.GOOGLE_PLACES_API_KEY}`
           );
           const placesData = await placesResponse.json() as {
             results?: Array<{
@@ -192,18 +200,80 @@ Only return valid JSON, no other text.`;
             
             console.log(`Found ${physicians.length} real doctors from Google Places API`);
           } else if (placesData.status === 'ZERO_RESULTS') {
-            console.log(`No doctors found near ${location} for specialty ${specialty}`);
+            noDoctorsFound = true;
+            console.log(`No doctors found near ${location} for specialty ${specialty} within ${searchRadius / 1000}km`);
+          } else if (placesData.status === 'REQUEST_DENIED' || placesData.status === 'INVALID_REQUEST') {
+            apiError = placesData.error_message || `Google Places API error: ${placesData.status}`;
+            console.error(`Google Places API error: ${apiError}`);
           } else if (placesData.error_message) {
-            console.warn(`Google Places API error: ${placesData.error_message}`);
+            apiError = placesData.error_message;
+            console.warn(`Google Places API error: ${apiError}`);
           }
         } else if (geocodeData.status === 'ZERO_RESULTS') {
-          console.log(`Could not geocode location: ${location}`);
+          locationError = `Could not find location: "${location}". Please check the spelling or try a different city name.`;
+          console.log(locationError);
+        } else if (geocodeData.status === 'REQUEST_DENIED' || geocodeData.status === 'INVALID_REQUEST') {
+          apiError = geocodeData.error_message || `Google Geocoding API error: ${geocodeData.status}`;
+          console.error(`Google Geocoding API error: ${apiError}`);
         } else if (geocodeData.error_message) {
-          console.warn(`Google Geocoding API error: ${geocodeData.error_message}`);
+          apiError = geocodeData.error_message;
+          console.warn(`Google Geocoding API error: ${apiError}`);
         }
       } catch (error) {
+        apiError = error instanceof Error ? error.message : 'An error occurred while searching for doctors. Please try again.';
         console.error('Google Places API error:', error);
       }
+    }
+
+    // Return error if API issues occurred
+    if (apiError) {
+      return res.status(500).json({
+        query,
+        specialty,
+        location: locationData || location,
+        results: [],
+        resultsCount: 0,
+        error: apiError,
+        suggestions: null,
+      });
+    }
+
+    // Return helpful message if location not found
+    if (locationError) {
+      return res.status(200).json({
+        query,
+        specialty,
+        location: location,
+        results: [],
+        resultsCount: 0,
+        error: locationError,
+        suggestions: [
+          'Check the spelling of the city or location name',
+          'Try using a more specific location (e.g., "Seattle, WA" instead of just "Seattle")',
+          'Use the full city and state name for better results',
+        ],
+      });
+    }
+
+    // Return helpful message if no doctors found
+    if (noDoctorsFound && location) {
+      const radiusKm = searchRadius / 1000;
+      return res.status(200).json({
+        query,
+        specialty,
+        location: locationData || location,
+        results: [],
+        resultsCount: 0,
+        error: null,
+        suggestions: [
+          `No ${specialty} doctors found within ${radiusKm}km of ${location}`,
+          `Try expanding your search radius (currently ${radiusKm}km)`,
+          `Try searching in a nearby larger city`,
+          `Try a more general specialty term (e.g., "Cardiologist" instead of "Interventional Cardiologist")`,
+          `Remove the location to see all available ${specialty} doctors`,
+        ],
+        searchRadius: searchRadius,
+      });
     }
 
     // Fallback to ChatGPT if no real doctors found or no location specified
@@ -284,6 +354,7 @@ Return as a JSON array of objects. Only return the JSON array, no other text.`;
       location: locationData || location,
       results: physicians,
       resultsCount,
+      searchRadius: location ? searchRadius : null,
     });
   } catch (error: any) {
     console.error('Search error:', error);

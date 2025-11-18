@@ -123,7 +123,7 @@ export const authApi = {
 
 // Search API
 export const searchApi = {
-  async searchPhysicians(query: string) {
+  async searchPhysicians(query: string, radius?: number) {
     return apiRequest<{
       query: string;
       specialty: string;
@@ -137,9 +137,12 @@ export const searchApi = {
         years_experience: number;
       }>;
       resultsCount: number;
+      error?: string | null;
+      suggestions?: string[] | null;
+      searchRadius?: number | null;
     }>('/search/physicians', {
       method: 'POST',
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, radius }),
     });
   },
 };
