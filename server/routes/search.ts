@@ -276,68 +276,24 @@ Only return valid JSON, no other text.`;
       });
     }
 
-    // Fallback to ChatGPT if no real doctors found or no location specified
-    if (physicians.length === 0) {
-      try {
-        const searchPrompt = `Generate a list of 5-10 physicians matching this search: "${query}"
-
-Specialty: ${specialty}
-Location: ${location || 'Not specified'}
-Search Terms: ${searchTerms}
-
-For each physician, provide:
-- name: Full name
-- specialty: Medical specialty
-- location: Office location (city, state)
-- phone: Phone number (format: (XXX) XXX-XXXX)
-- rating: Rating out of 5 (1 decimal place)
-- years_experience: Years of experience (number)
-
-Return as a JSON array of objects. Only return the JSON array, no other text.`;
-
-        const searchResponse = await openai.chat.completions.create({
-          model: 'o4-mini-deep-research',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a medical directory assistant. Generate realistic physician information. Always return valid JSON only.',
-            },
-            {
-              role: 'user',
-              content: searchPrompt,
-            },
-          ],
-          temperature: 0.7,
-        });
-
-        try {
-          physicians = JSON.parse(searchResponse.choices[0].message.content || '[]');
-          console.log(`Generated ${physicians.length} physicians using ChatGPT`);
-        } catch (parseError) {
-          console.error('Error parsing physician results:', parseError);
-          physicians = [];
-        }
-      } catch (openaiError: any) {
-        console.warn('OpenAI search generation failed, using fallback results:', openaiError.message);
-        
-        // Fallback: Generate mock results when OpenAI is unavailable
-        const mockNames = [
-          'Dr. Sarah Johnson',
-          'Dr. Michael Chen',
-          'Dr. Emily Rodriguez',
-          'Dr. James Wilson',
-          'Dr. Lisa Anderson',
-        ];
-        
-        physicians = mockNames.map((name, index) => ({
-          name,
-          specialty,
-          location: location || 'City, State',
-          phone: `(555) ${200 + index}-${1000 + index * 111}`,
-          rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
-          years_experience: 5 + Math.floor(Math.random() * 25),
-        }));
-      }
+    // Only return real doctors - no mock data or ChatGPT fallback
+    // If no doctors found and we have a location, we already returned helpful suggestions above
+    // If no location specified, return empty results with a message
+    if (physicians.length === 0 && !location) {
+      return res.status(200).json({
+        query,
+        specialty,
+        location: null,
+        results: [],
+        resultsCount: 0,
+        error: null,
+        suggestions: [
+          'Please specify a location in your search (e.g., "Retina Surgeons in Tacoma")',
+          'We only return real doctors from verified sources',
+          'Try searching with a city name to find doctors in that area',
+        ],
+        searchRadius: null,
+      });
     }
 
     const resultsCount = physicians.length;

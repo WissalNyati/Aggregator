@@ -224,29 +224,78 @@ ${resultsText}`;
               </div>
             </div>
 
-            <div>
-              <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-2">
-                Search Radius: {searchRadius} km
-              </label>
-              <div className="flex items-center gap-4">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
+              <div className="flex items-center justify-between mb-3">
+                <label htmlFor="radius" className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  Search Radius
+                </label>
+                <span className="text-lg font-bold text-blue-600 bg-white px-3 py-1 rounded-lg shadow-sm">
+                  {searchRadius} km
+                </span>
+              </div>
+              <div className="relative">
                 <input
                   id="radius"
                   type="range"
                   min="1"
                   max="50"
+                  step="1"
                   value={searchRadius}
                   onChange={(e) => setSearchRadius(Number(e.target.value))}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="w-full h-3 bg-gradient-to-r from-blue-200 via-blue-300 to-indigo-300 rounded-full appearance-none cursor-pointer slider"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((searchRadius - 1) / 49) * 100}%, #e5e7eb ${((searchRadius - 1) / 49) * 100}%, #e5e7eb 100%)`
+                  }}
                   disabled={searching}
                 />
-                <div className="flex gap-2 text-sm text-gray-600">
-                  <span className="w-8 text-center">1km</span>
-                  <span className="w-8 text-center">25km</span>
-                  <span className="w-8 text-center">50km</span>
-                </div>
+                <style>{`
+                  .slider::-webkit-slider-thumb {
+                    appearance: none;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    cursor: pointer;
+                    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4), 0 0 0 4px rgba(59, 130, 246, 0.1);
+                    transition: all 0.2s ease;
+                  }
+                  .slider::-webkit-slider-thumb:hover {
+                    transform: scale(1.1);
+                    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.15);
+                  }
+                  .slider::-moz-range-thumb {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    cursor: pointer;
+                    border: none;
+                    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4), 0 0 0 4px rgba(59, 130, 246, 0.1);
+                    transition: all 0.2s ease;
+                  }
+                  .slider::-moz-range-thumb:hover {
+                    transform: scale(1.1);
+                    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.15);
+                  }
+                `}</style>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Expand the radius to search in a wider area around your location
+              <div className="flex justify-between mt-2 text-xs text-gray-500">
+                <span className="font-medium">1 km</span>
+                <span className="font-medium">25 km</span>
+                <span className="font-medium">50 km</span>
+              </div>
+              {searchResults && searchResults.searchRadius && (
+                <div className="mt-3 p-2 bg-white rounded-lg border border-blue-200">
+                  <p className="text-xs text-gray-600 flex items-center gap-1">
+                    <span className="text-blue-500">📍</span>
+                    Last search used <span className="font-semibold text-blue-600">{searchResults.searchRadius / 1000} km</span> radius
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-gray-600 mt-3 flex items-center gap-1">
+                <span className="text-blue-500">💡</span>
+                Adjust the radius to search a wider or narrower area. Click "Search Physicians" to apply.
               </p>
             </div>
 
