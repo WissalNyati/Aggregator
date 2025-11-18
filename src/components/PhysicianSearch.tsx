@@ -1,8 +1,24 @@
 import { useState } from 'react';
-import { Search, LogOut, User, Stethoscope } from 'lucide-react';
+import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import { SearchHistory } from './SearchHistory';
+
+interface SearchResult {
+  query: string;
+  specialty: string;
+  location: string | { formatted_address: string; name?: string; location?: { lat: number; lng: number } } | null;
+  results: Array<{
+    name: string;
+    specialty: string;
+    location: string;
+    phone: string;
+    rating: number;
+    years_experience: number;
+  }>;
+  resultsCount: number;
+  error?: string;
+}
 
 export function PhysicianSearch() {
   const { user, signOut } = useAuth();
@@ -10,6 +26,8 @@ export function PhysicianSearch() {
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,38 +48,10 @@ export function PhysicianSearch() {
         results.resultsCount
       );
 
-      // Display results
-      let displayMessage = '';
-      
-      if (results.resultsCount === 0) {
-        // Format a user-friendly message for no results
-        displayMessage = `SEARCH RESULTS\n${'='.repeat(60)}\n\n`;
-        displayMessage += `No physicians found matching: "${query}"\n\n`;
-        displayMessage += `SUGGESTIONS TO IMPROVE YOUR SEARCH:\n`;
-        displayMessage += `• Try using more general terms (e.g., "cardiologist" instead of a specific name)\n`;
-        displayMessage += `• Check the spelling of the specialty or location\n`;
-        displayMessage += `• Try a nearby city or broader geographic area\n`;
-        displayMessage += `• Search by specialty only (e.g., "dermatologist")\n`;
-        displayMessage += `• Remove specific doctor names and search by practice type\n\n`;
-        displayMessage += `EXAMPLE SEARCHES THAT WORK WELL:\n`;
-        displayMessage += `• "Retina Surgeons in Tacoma"\n`;
-        displayMessage += `• "Orthopedic specialists near Seattle"\n`;
-        displayMessage += `• "Primary care physician in Boston"\n`;
-        displayMessage += `• "Cardiologists in Los Angeles"\n\n`;
-        displayMessage += `${'='.repeat(60)}\n`;
-        displayMessage += `This message can be copied and pasted for your records.`;
-      } else {
-        // Format regular results
-        const resultsText = results.results
-          .map((p, i) => `${i + 1}. ${p.name} - ${p.specialty}\n   ${p.location} | ${p.phone} | ⭐ ${p.rating}/5`)
-          .join('\n\n');
-        displayMessage = `Found ${results.resultsCount} physicians matching "${query}":\n\n${resultsText}`;
-      }
-
-      alert(displayMessage);
-
+      // Store results for display
+      setSearchResults(results);
       setQuery('');
-      setShowHistory(true);
+      setShowHistory(false);
     } catch (error: any) {
       console.error('Search error:', error);
       
@@ -74,7 +64,15 @@ export function PhysicianSearch() {
         errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      // Display error as a result-like message
+      setSearchResults({
+        query: query,
+        specialty: 'Unknown',
+        location: null,
+        results: [],
+        resultsCount: 0,
+        error: errorMessage,
+      });
     } finally {
       setSearching(false);
     }
@@ -83,6 +81,72 @@ export function PhysicianSearch() {
   const handleSelectSearch = (searchQuery: string) => {
     setQuery(searchQuery);
     setShowHistory(false);
+    setSearchResults(null);
+  };
+
+  const formatResultsText = (results: SearchResult): string => {
+    if (results.error) {
+      return `Search Error: ${results.error}
+
+Search Query: "${results.query}"
+
+Please try again or contact support if the issue persists.`;
+    }
+
+    if (results.resultsCount === 0) {
+      const locationText = typeof results.location === 'string' 
+        ? results.location 
+        : results.location?.formatted_address || 'your area';
+      
+      return `No physicians found matching "${results.query}"
+
+Search Details:
+- Specialty: ${results.specialty}
+- Location: ${locationText}
+
+Suggestions to improve your search:
+• Try a broader location (e.g., "Seattle" instead of "Seattle Downtown")
+• Use more general specialty terms (e.g., "Cardiologist" instead of "Interventional Cardiologist")
+• Remove specific physician names if searching by specialty
+• Try searching by city and state (e.g., "Retina Surgeons in Tacoma, WA")
+• Check spelling of location or specialty names
+
+You can also try:
+- Searching without location to see all available physicians
+- Using alternative specialty names
+- Expanding your search radius`;
+    }
+
+    const resultsText = results.results
+      .map((p, i) => `${i + 1}. ${p.name} - ${p.specialty}\n   ${p.location} | ${p.phone} | ⭐ ${p.rating}/5`)
+      .join('\n\n');
+
+    const locationText = typeof results.location === 'string' 
+      ? results.location 
+      : results.location?.formatted_address || 'Not specified';
+
+    return `Found ${results.resultsCount} physician${results.resultsCount !== 1 ? 's' : ''} matching "${results.query}"
+
+Search Details:
+- Specialty: ${results.specialty}
+- Location: ${locationText}
+
+Results:
+
+${resultsText}`;
+  };
+
+  const handleCopyResults = async () => {
+    if (!searchResults) return;
+    
+    const textToCopy = formatResultsText(searchResults);
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
   return (
@@ -166,7 +230,59 @@ export function PhysicianSearch() {
           </div>
         </div>
 
-        {showHistory && <SearchHistory onSelectSearch={handleSelectSearch} />}
+        {searchResults && (
+          <div className="bg-white shadow-lg border border-gray-200 rounded-2xl p-8 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                {searchResults.resultsCount === 0 ? (
+                  <AlertCircle className="w-6 h-6 text-amber-500" />
+                ) : (
+                  <Stethoscope className="w-6 h-6 text-blue-600" />
+                )}
+                <h2 className="text-xl font-bold text-gray-900">
+                  {searchResults.resultsCount === 0 ? 'No Results Found' : 'Search Results'}
+                </h2>
+              </div>
+              <button
+                onClick={handleCopyResults}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+                title="Copy results to clipboard"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+              <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
+                {formatResultsText(searchResults)}
+              </pre>
+            </div>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => {
+                  setSearchResults(null);
+                  setShowHistory(true);
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+              >
+                New Search
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showHistory && !searchResults && <SearchHistory onSelectSearch={handleSelectSearch} />}
       </div>
     </div>
   );
