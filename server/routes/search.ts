@@ -271,10 +271,10 @@ Only return valid JSON, no other text.`;
           error: null,
           suggestions: [
             `No ${specialty} doctors found within ${radiusKm}km of ${location}`,
-            `Try expanding your search radius (currently ${radiusKm}km)`,
-            `Try searching in a nearby larger city (e.g., "Houston, TX" or "Dallas, TX" instead of just "Texas")`,
-            `Try a more general specialty term (e.g., "Cardiologist" instead of "Heart Surgeon")`,
-            `Try a different city or location`,
+            `Expand your search radius to include a wider area (currently ${radiusKm}km)`,
+            `Try searching in a larger nearby city (e.g., "Houston, TX" or "Dallas, TX" instead of just "Texas")`,
+            `Use a more general specialty term (e.g., "Cardiologist" instead of "Heart Surgeon")`,
+            `Try a different city or location name`,
           ],
           searchRadius: searchRadius,
         });
@@ -288,9 +288,9 @@ Only return valid JSON, no other text.`;
           resultsCount: 0,
           error: null,
           suggestions: [
-            'Please specify a location in your search (e.g., "Heart Surgeons in Houston, TX")',
-            'We only return real doctors from verified sources - location is required',
-            'Try searching with a specific city name to find doctors in that area',
+            'Include a specific city or location in your search (e.g., "Heart Surgeons in Houston, TX")',
+            'Use the format: "[Specialty] in [City, State]" for best results',
+            'Try searching with a major city name to find doctors in that area',
             'Examples: "Cardiologists in Dallas, TX" or "Heart Surgeons in Austin, Texas"',
           ],
           searchRadius: null,

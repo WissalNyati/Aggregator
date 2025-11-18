@@ -115,25 +115,19 @@ Search Details:
     }
 
     if (results.resultsCount === 0) {
-      const locationText = getLocationText(results.location) || 'your area';
-      const radiusText = results.searchRadius ? ` (within ${results.searchRadius / 1000}km)` : '';
+      const locationText = getLocationText(results.location) || 'Not specified';
+      const radiusText = results.searchRadius ? ` (within ${results.searchRadius / 1000}km radius)` : '';
       
       let noResultsText = `No physicians found matching "${results.query}"
 
-Search Details:
+Search Parameters:
 - Specialty: ${results.specialty}
 - Location: ${locationText}${radiusText}`;
 
+      // Don't include suggestions in the text - they'll be shown in the suggestions box below
+      // Just add a note that suggestions are available
       if (results.suggestions && results.suggestions.length > 0) {
-        noResultsText += `\n\nSuggestions:\n${results.suggestions.map(s => `• ${s}`).join('\n')}`;
-      } else {
-        noResultsText += `\n\nSuggestions to improve your search:
-• Try a broader location (e.g., "Seattle" instead of "Seattle Downtown")
-• Use more general specialty terms (e.g., "Cardiologist" instead of "Interventional Cardiologist")
-• Remove specific physician names if searching by specialty
-• Try searching by city and state (e.g., "Retina Surgeons in Tacoma, WA")
-• Check spelling of location or specialty names
-• Expand your search radius to include a wider area`;
+        noResultsText += `\n\nPlease see suggestions below to refine your search.`;
       }
 
       return noResultsText;
@@ -364,13 +358,23 @@ ${resultsText}`;
             </div>
 
             {searchResults.suggestions && searchResults.suggestions.length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 className="text-sm font-semibold text-blue-900 mb-2">💡 Suggestions:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
-                  {searchResults.suggestions.map((suggestion, index) => (
-                    <li key={index}>{suggestion}</li>
-                  ))}
-                </ul>
+              <div className="mt-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-bold">💡</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">How to improve your search:</h3>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      {searchResults.suggestions.map((suggestion, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-blue-500 mt-0.5">•</span>
+                          <span>{suggestion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
 
