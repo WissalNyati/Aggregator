@@ -44,7 +44,7 @@ export function PhysicianSearch() {
       await addToHistory(
         results.query,
         results.specialty,
-        typeof results.location === 'string' ? results.location : results.location?.formatted_address || null,
+        getLocationText(results.location),
         results.resultsCount
       );
 
@@ -84,6 +84,13 @@ export function PhysicianSearch() {
     setSearchResults(null);
   };
 
+  // Helper function to get location text
+  const getLocationText = (location: SearchResult['location']): string => {
+    if (!location) return 'Not specified';
+    if (typeof location === 'string') return location;
+    return location.formatted_address || 'Not specified';
+  };
+
   const formatResultsText = (results: SearchResult): string => {
     if (results.error) {
       return `Search Error: ${results.error}
@@ -94,9 +101,7 @@ Please try again or contact support if the issue persists.`;
     }
 
     if (results.resultsCount === 0) {
-      const locationText = typeof results.location === 'string' 
-        ? results.location 
-        : results.location?.formatted_address || 'your area';
+      const locationText = getLocationText(results.location) || 'your area';
       
       return `No physicians found matching "${results.query}"
 
@@ -121,9 +126,7 @@ You can also try:
       .map((p, i) => `${i + 1}. ${p.name} - ${p.specialty}\n   ${p.location} | ${p.phone} | ⭐ ${p.rating}/5`)
       .join('\n\n');
 
-    const locationText = typeof results.location === 'string' 
-      ? results.location 
-      : results.location?.formatted_address || 'Not specified';
+    const locationText = getLocationText(results.location);
 
     return `Found ${results.resultsCount} physician${results.resultsCount !== 1 ? 's' : ''} matching "${results.query}"
 

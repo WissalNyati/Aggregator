@@ -30,10 +30,10 @@ export function useSearchHistory() {
   }, [user]);
 
   const addToHistory = async (
-    query: string,
-    specialty: string | null,
-    location: string | null,
-    resultsCount: number
+    _query: string,
+    _specialty: string | null,
+    _location: string | null,
+    _resultsCount: number
   ) => {
     // History is now automatically saved by the search API
     // Just refresh the history list
