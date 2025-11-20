@@ -13,13 +13,11 @@
 
 # Redirect all requests to index.html (SPA routing)
 # Netlify automatically handles /.netlify/functions/* routes, so they won't be caught by this redirect
-# Exclude static files from redirect
+# This ensures client-side routing works for React SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = false
-  conditions = {Role = ["admin"]}
   
 # Explicitly allow robots.txt and sitemap.xml
 [[redirects]]
