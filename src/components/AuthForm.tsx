@@ -6,6 +6,9 @@ export function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp, signIn } = useAuth();
@@ -23,6 +26,12 @@ export function AuthForm() {
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (isSignUp && password !== confirmPassword) {
+      setError('Passwords do not match');
       setLoading(false);
       return;
     }
@@ -65,6 +74,9 @@ export function AuthForm() {
               onClick={() => {
                 setIsSignUp(false);
                 setError('');
+                setConfirmPassword('');
+                setShowPassword(false);
+                setShowConfirmPassword(false);
               }}
               className={`flex-1 py-3 text-sm font-semibold transition-all ${
                 !isSignUp
@@ -78,6 +90,9 @@ export function AuthForm() {
               onClick={() => {
                 setIsSignUp(true);
                 setError('');
+                setConfirmPassword('');
+                setShowPassword(false);
+                setShowConfirmPassword(false);
               }}
               className={`flex-1 py-3 text-sm font-semibold transition-all ${
                 isSignUp
@@ -116,22 +131,58 @@ export function AuthForm() {
               <label htmlFor="password" className="block text-subheading text-sm mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-professional"
-                placeholder="••••••••"
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-professional pr-16"
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
               {isSignUp && (
                 <p className="mt-2 text-xs text-body">
                   Must be at least 6 characters
                 </p>
               )}
             </div>
+
+            {isSignUp && (
+              <div>
+                <label htmlFor="confirm-password" className="block text-subheading text-sm mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-professional pr-16"
+                    placeholder="Repeat password"
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  >
+                    {showConfirmPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -164,6 +215,9 @@ export function AuthForm() {
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setError('');
+                  setConfirmPassword('');
+                  setShowPassword(false);
+                  setShowConfirmPassword(false);
                 }}
                 className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
               >

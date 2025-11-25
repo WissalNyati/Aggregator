@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle, Phone, MapPin, Star, Clock, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle, Phone, MapPin, Star, Clock, ChevronDown, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import { SearchHistory } from './SearchHistory';
@@ -44,7 +44,112 @@ interface DoctorCardProps {
   index: number;
 }
 
+interface DeepSearchData {
+  website?: string;
+  education?: string[];
+  certifications?: string[];
+  practiceLocations?: string[];
+  reviews?: Array<{
+    source: string;
+    snippet: string;
+  }>;
+}
+
+async function fetchDeepSearchInfo(npi?: string): Promise<DeepSearchData> {
+  // Placeholder for future API integration
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  return {
+    website: 'https://www.healthgrades.com/physician',
+    education: ['Johns Hopkins School of Medicine', 'Stanford Residency Program'],
+    certifications: ['American Board of Ophthalmology', 'Vitreoretinal Surgery Fellowship'],
+    practiceLocations: ['Northwest Vision Center, Seattle, WA', 'Puget Sound Eye Specialists, Tacoma, WA'],
+    reviews: [
+      { source: 'Vitals', snippet: 'Highly attentive and thorough during exams.' },
+      { source: 'Healthgrades', snippet: 'Helped me understand every step of the procedure.' },
+    ],
+  };
+}
+
+function DeepSearchPanel({ data }: { data: DeepSearchData }) {
+  return (
+    <div className="mt-4 p-4 border border-blue-100 rounded-2xl bg-blue-50/50 space-y-3">
+      {data.website && (
+        <p className="text-sm text-blue-700 flex items-center gap-2">
+          <ExternalLink className="w-4 h-4" />
+          <a href={data.website} target="_blank" rel="noopener noreferrer" className="underline">
+            Visit official website
+          </a>
+        </p>
+      )}
+      {data.education && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Education</p>
+          <ul className="text-sm text-body list-disc ml-4">
+            {data.education.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.certifications && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Certifications</p>
+          <ul className="text-sm text-body list-disc ml-4">
+            {data.certifications.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.practiceLocations && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Practice Locations</p>
+          <ul className="text-sm text-body list-disc ml-4">
+            {data.practiceLocations.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.reviews && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Recent Feedback</p>
+          <div className="space-y-2">
+            {data.reviews.map((review, idx) => (
+              <div key={idx} className="text-sm text-body">
+                <p className="font-semibold text-gray-900">{review.source}</p>
+                <p className="text-gray-600">“{review.snippet}”</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DoctorCard({ doctor, index }: DoctorCardProps) {
+  const [showDeepInfo, setShowDeepInfo] = useState(false);
+  const [deepSearchData, setDeepSearchData] = useState<DeepSearchData | null>(null);
+  const [deepSearchLoading, setDeepSearchLoading] = useState(false);
+  const [deepSearchError, setDeepSearchError] = useState<string | null>(null);
+
+  const runDeepSearch = async () => {
+    if (deepSearchLoading) return;
+    setDeepSearchLoading(true);
+    setDeepSearchError(null);
+    try {
+      const data = await fetchDeepSearchInfo(doctor.npi);
+      setDeepSearchData(data);
+      setShowDeepInfo(true);
+    } catch (error) {
+      console.error('Deep search error:', error);
+      setDeepSearchError('Unable to fetch detailed info. Please try again later.');
+    } finally {
+      setDeepSearchLoading(false);
+    }
+  };
+
   return (
     <div 
       className="doctor-card animate-fade-in"
@@ -95,16 +200,77 @@ function DoctorCard({ doctor, index }: DoctorCardProps) {
             <span>{doctor.years_experience}+ years</span>
           </div>
         </div>
+        <button
+          onClick={runDeepSearch}
+          disabled={deepSearchLoading}
+          className="w-full mt-4 btn-secondary text-sm justify-center flex items-center gap-2"
+        >
+          {deepSearchLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Gathering detailed info...
+            </>
+          ) : (
+            <>
+              <span role="img" aria-label="search">🔍</span>
+              Get Detailed Info
+            </>
+          )}
+        </button>
+        {deepSearchError && (
+          <p className="text-xs text-red-600 mt-2">{deepSearchError}</p>
+        )}
+        {showDeepInfo && deepSearchData && (
+          <DeepSearchPanel data={deepSearchData} />
+        )}
       </div>
     </div>
   );
 }
 
+function SearchGuidance() {
+  return (
+    <div className="search-guidance glass-card p-4 rounded-2xl border border-blue-100 space-y-3">
+      <h3 className="text-subheading text-sm">How to search for doctors</h3>
+      <ul className="space-y-2 text-sm text-body">
+        <li>✅ <strong>Doctor Name + Location</strong> (e.g., “Dr. Smith in Seattle”)</li>
+        <li>✅ <strong>Doctor Name + Specialty</strong> (e.g., “Mark Nelson retina surgeon”)</li>
+        <li>✅ <strong>Specialty + Location</strong> (e.g., “Cardiologist Tacoma”)</li>
+        <li>❌ Specialty alone (needs a location)</li>
+        <li>❌ Location alone (needs a specialty or doctor name)</li>
+      </ul>
+    </div>
+  );
+}
+
+function MapIntegration({ doctors }: { doctors: SearchResult['results'] }) {
+  if (!doctors.length) return null;
+
+  return (
+    <div className="map-section glass-card p-5 rounded-3xl border border-gray-100 mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-heading text-lg">Doctors in your area</h3>
+          <p className="text-body text-sm">Interactive map experience coming soon</p>
+        </div>
+        <span className="text-sm font-semibold text-blue-600">{doctors.length} markers</span>
+      </div>
+      <div className="map-placeholder rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-body text-sm">
+        📍 Preview coordinates will appear here once the interactive map is live.
+      </div>
+      <button className="view-map-btn btn-secondary w-full mt-4">
+        📍 View on Interactive Map (Beta)
+      </button>
+    </div>
+  );
+}
+
+const DEFAULT_RADIUS_METERS = 25000;
+
 export function PhysicianSearch() {
   const { user, signOut } = useAuth();
   const { addToHistory, saveSearchResults, getSearchResults, refreshHistory } = useSearchHistory();
   const [query, setQuery] = useState('');
-  const [searchRadius, setSearchRadius] = useState(5);
   const [searching, setSearching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
@@ -114,6 +280,8 @@ export function PhysicianSearch() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState('');
+  const [currentSearchLocation, setCurrentSearchLocation] = useState('');
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
   // SEO optimization
@@ -138,8 +306,9 @@ export function PhysicianSearch() {
 
     try {
       const { searchApi } = await import('../lib/api');
-      const radiusInMeters = searchRadius * 1000;
-      const results = await searchApi.searchPhysicians(query, radiusInMeters, page, 15);
+      const radiusInMeters = DEFAULT_RADIUS_METERS;
+      const trimmedQuery = query.trim();
+      const results = await searchApi.searchPhysicians(trimmedQuery, radiusInMeters, page, 15);
 
       if (page === 1) {
         // First page - replace results
@@ -147,6 +316,8 @@ export function PhysicianSearch() {
         setAllResults(results.results);
         setCurrentPage(1);
         setHasMoreResults(results.pagination?.hasMore || false);
+        setCurrentSearchQuery(results.query);
+        setCurrentSearchLocation(getLocationText(results.location));
 
         // Save to history (this triggers backend save)
         await addToHistory(
@@ -232,7 +403,7 @@ export function PhysicianSearch() {
 
     try {
       const { searchApi } = await import('../lib/api');
-      const radiusInMeters = searchRadius * 1000;
+      const radiusInMeters = DEFAULT_RADIUS_METERS;
       const results = await searchApi.searchPhysicians(searchResults.query, radiusInMeters, nextPage, 15);
 
       setAllResults(prev => [...prev, ...results.results]);
@@ -276,6 +447,8 @@ export function PhysicianSearch() {
         setCurrentPage(storedResults.pagination?.currentPage || 1);
         setHasMoreResults(storedResults.pagination?.hasMore || false);
         setQuery(storedResults.query);
+        setCurrentSearchQuery(storedResults.query);
+        setCurrentSearchLocation(getLocationText(storedResults.location));
         
         // Scroll to results
         setTimeout(() => {
@@ -284,6 +457,8 @@ export function PhysicianSearch() {
       } else {
         // Fallback: if results not found, just set query and let user search again
         setQuery(historyItem.query);
+        setCurrentSearchQuery(historyItem.query);
+        setCurrentSearchLocation('');
         setSearchResults(null);
         setAllResults([]);
         setCurrentPage(1);
@@ -387,82 +562,18 @@ export function PhysicianSearch() {
               <label htmlFor="search" className="block text-subheading text-sm mb-2">
                 Search for physicians
               </label>
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  id="search"
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder='Try "Retina Surgeons in Tacoma" or "Dr. Smith Orthopedic Kansas City"'
-                  className="input-professional pl-12 pr-4 py-4 text-base"
-                  disabled={searching}
-                />
-              </div>
+              <input
+                id="search"
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder='Try "Retina Surgeons in Tacoma" or "Dr. Smith Orthopedic Kansas City"'
+                className="search-input text-base"
+                disabled={searching}
+              />
             </div>
 
-            <div className="glass-card rounded-2xl p-5 border border-blue-100/50">
-              <div className="flex items-center justify-between mb-3">
-                <label htmlFor="radius" className="text-subheading text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                  Search Radius
-                </label>
-                <span className="text-lg font-bold text-blue-600 bg-white px-4 py-1.5 rounded-xl shadow-sm">
-                  {searchRadius} km
-                </span>
-              </div>
-              <div className="relative">
-                <input
-                  id="radius"
-                  type="range"
-                  min="1"
-                  max="50"
-                  step="1"
-                  value={searchRadius}
-                  onChange={(e) => setSearchRadius(Number(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-blue-200 via-blue-300 to-indigo-300 rounded-full appearance-none cursor-pointer slider"
-                  style={{
-                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((searchRadius - 1) / 49) * 100}%, #e5e7eb ${((searchRadius - 1) / 49) * 100}%, #e5e7eb 100%)`
-                  }}
-                  disabled={searching}
-                />
-                <style>{`
-                  .slider::-webkit-slider-thumb {
-                    appearance: none;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                    cursor: pointer;
-                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4), 0 0 0 4px rgba(59, 130, 246, 0.1);
-                    transition: all 0.2s ease;
-                  }
-                  .slider::-webkit-slider-thumb:hover {
-                    transform: scale(1.15);
-                    box-shadow: 0 3px 12px rgba(59, 130, 246, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.15);
-                  }
-                  .slider::-moz-range-thumb {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                    cursor: pointer;
-                    border: none;
-                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4), 0 0 0 4px rgba(59, 130, 246, 0.1);
-                    transition: all 0.2s ease;
-                  }
-                  .slider::-moz-range-thumb:hover {
-                    transform: scale(1.15);
-                    box-shadow: 0 3px 12px rgba(59, 130, 246, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.15);
-                  }
-                `}</style>
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span className="font-medium">1 km</span>
-                <span className="font-medium">25 km</span>
-                <span className="font-medium">50 km</span>
-              </div>
-            </div>
+            <SearchGuidance />
 
             <button
               type="submit"
@@ -530,6 +641,21 @@ export function PhysicianSearch() {
               </button>
             </div>
 
+            {searchResults.resultsCount > 0 && (
+              <div className="results-summary mb-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 flex flex-wrap gap-4 text-sm text-body">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Search query</p>
+                  <p className="text-heading">{currentSearchQuery || searchResults.query}</p>
+                </div>
+                {currentSearchLocation && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Location</p>
+                    <p className="text-heading">{currentSearchLocation}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {searchResults.error ? (
               <div className="glass-card rounded-2xl p-6 border border-amber-200 bg-amber-50/50">
                 <div className="flex items-start gap-3">
@@ -594,6 +720,8 @@ export function PhysicianSearch() {
                   </div>
                 )}
 
+                <MapIntegration doctors={allResults} />
+
                 {searchResults.suggestions && searchResults.suggestions.length > 0 && (
                   <div className="mt-6 glass-card rounded-2xl p-5 border border-blue-200">
                     <div className="flex items-start gap-3">
@@ -623,6 +751,8 @@ export function PhysicianSearch() {
                       setCurrentPage(1);
                       setHasMoreResults(false);
                       setShowHistory(true);
+                      setCurrentSearchQuery('');
+                      setCurrentSearchLocation('');
                     }}
                     className="btn-secondary text-sm py-2 px-4"
                   >

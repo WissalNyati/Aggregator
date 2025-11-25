@@ -555,6 +555,30 @@ const SPECIALTY_ALTERNATIVES: { [key: string]: string[] } = {
   'General Practice': ['Primary Care', 'Family Medicine'],
 };
 
+// Location name fixes / normalization rules
+const LOCATION_FIXES: Record<string, string> = {
+  'tukwilla': 'Tukwila, WA',
+  'tukwillla': 'Tukwila, WA',
+  'tukwila': 'Tukwila, WA',
+  'seattle area': 'Seattle, WA',
+  'tacoma wa': 'Tacoma, WA',
+  'kopstein tukwilla': 'Tukwila, WA',
+  'los angeles ca': 'Los Angeles, CA',
+  'san fran': 'San Francisco, CA',
+  'nyc': 'New York, NY',
+};
+
+// Common city/state aliases for strict matching
+const LOCATION_ALIAS_MAP: Record<string, string> = {
+  'tukwila': 'tukwila',
+  'tukwilla': 'tukwila',
+  'seattle area': 'seattle',
+  'los angeles': 'los angeles',
+  'la': 'los angeles',
+  'nyc': 'new york',
+  'new york city': 'new york',
+};
+
 // String similarity function for fuzzy matching
 function stringSimilarity(s1: string, s2: string): number {
   const longer = s1.length > s2.length ? s1 : s2;
@@ -635,6 +659,120 @@ function getBroaderSpecialty(specialty: string): string | null {
 // Get related specialties for search expansion
 function getRelatedSpecialties(specialty: string): string[] {
   return RELATED_SPECIALTIES[specialty] || [];
+}
+
+function normalizeLocationString(location: string | null): string | null {
+  if (!location) return null;
+  const trimmed = location.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (LOCATION_FIXES[lower]) {
+    return LOCATION_FIXES[lower];
+  }
+  return trimmed.replace(/\s{2,}/g, ' ');
+}
+
+function canonicalizeLocationTerm(value: string | null): string | null {
+  if (!value) return null;
+  const lower = value.toLowerCase().trim();
+  if (!lower) return null;
+  if (LOCATION_ALIAS_MAP[lower]) {
+    return LOCATION_ALIAS_MAP[lower];
+  }
+  return lower;
+}
+
+function extractCityStateFromAddress(address: string | null): { city: string | null; state: string | null } {
+  if (!address) return { city: null, state: null };
+  const cityStateMatch = address.match(/([A-Za-z\s]+),\s*([A-Z]{2})/);
+  if (cityStateMatch) {
+    return {
+      city: cityStateMatch[1].trim(),
+      state: cityStateMatch[2].trim(),
+    };
+  }
+  const parts = address.split(',');
+  if (parts.length >= 2) {
+    return {
+      city: parts[parts.length - 2]?.trim() || null,
+      state: parts[parts.length - 1]?.trim().split(' ')[0] || null,
+    };
+  }
+  return { city: null, state: null };
+}
+
+function filterActiveNppesResults(doctors: NPPESProvider[]): NPPESProvider[] {
+  return doctors.filter((doctor) => {
+    const status = doctor.basic.status?.toLowerCase() || '';
+    const name = `${doctor.basic.first_name || ''} ${doctor.basic.last_name || ''}`.toLowerCase();
+    const specialty = doctor.taxonomies?.[0]?.desc?.toLowerCase() || '';
+    const hasLocationAddress = doctor.addresses?.some(
+      (addr) => addr.address_purpose === 'LOCATION' && !!addr.address_1
+    );
+    const hasPhone =
+      doctor.addresses?.some((addr) => !!addr.telephone_number) ||
+      doctor.addresses?.some((addr) => !!addr.fax_number);
+
+    const looksRetired =
+      status.includes('retired') ||
+      name.includes('retired') ||
+      specialty.includes('retired') ||
+      !hasLocationAddress ||
+      !hasPhone;
+
+    return !looksRetired;
+  });
+}
+
+function filterPhysiciansByLocation(
+  physicians: Array<{
+    name: string;
+    specialty: string;
+    location: string;
+    phone: string;
+    rating: number;
+    years_experience: number;
+    npi?: string;
+  }>,
+  searchCity: string | null,
+  searchState: string | null,
+  searchLocation: string | null
+) {
+  if (!searchCity && !searchState && !searchLocation) {
+    return physicians;
+  }
+
+  const canonicalSearchCity = canonicalizeLocationTerm(searchCity);
+  const canonicalSearchLocation = canonicalizeLocationTerm(searchLocation);
+  const targetState = searchState?.toLowerCase();
+
+  return physicians.filter((doctor) => {
+    const { city: doctorCity, state: doctorState } = extractCityStateFromAddress(doctor.location);
+    const doctorCityCanonical = canonicalizeLocationTerm(doctorCity);
+    const doctorStateLower = doctorState?.toLowerCase();
+
+    if (targetState && doctorStateLower && targetState !== doctorStateLower.toLowerCase()) {
+      return false;
+    }
+
+    if (canonicalSearchCity && doctorCityCanonical) {
+      if (doctorCityCanonical.includes(canonicalSearchCity) || canonicalSearchCity.includes(doctorCityCanonical)) {
+        return true;
+      }
+    }
+
+    if (canonicalSearchLocation) {
+      const doctorLocationLower = doctor.location.toLowerCase();
+      if (
+        doctorLocationLower.includes(canonicalSearchLocation) ||
+        (doctorCityCanonical && canonicalSearchLocation.includes(doctorCityCanonical))
+      ) {
+        return true;
+      }
+    }
+
+    return !searchCity && !searchLocation;
+  });
 }
 
 // Parse name from query string (handles middle initials)
@@ -886,7 +1024,7 @@ searchRoutes.post('/physicians', authenticateToken, async (req: AuthRequest, res
       lastName: parsed.lastName,
     };
     specialty = parsed.specialty;
-    location = parsed.location;
+    location = normalizeLocationString(parsed.location);
 
     console.log('=== PARSED QUERY PARAMETERS ===');
     console.log('Parsed Name:', extractedName);
@@ -961,7 +1099,7 @@ Only return valid JSON, no other text.`;
           }
         }
         if (extractedData.location) {
-          location = extractedData.location;
+          location = normalizeLocationString(extractedData.location);
           console.log('Updated location from OpenAI:', location);
         }
       } catch (openaiError: any) {
@@ -1028,6 +1166,7 @@ Only return valid JSON, no other text.`;
       state
     );
     console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results`);
+    nppesResults = filterActiveNppesResults(nppesResults);
 
     // Attempt 2: Remove location constraint if no results
     if (nppesResults.length === 0 && (city || state)) {
@@ -1040,6 +1179,7 @@ Only return valid JSON, no other text.`;
         null
       );
       console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (without location)`);
+      nppesResults = filterActiveNppesResults(nppesResults);
     }
 
     // Attempt 3: Try specialty-only search if we have specialty but no name
@@ -1054,6 +1194,7 @@ Only return valid JSON, no other text.`;
           state
         );
         console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (specialty + location)`);
+        nppesResults = filterActiveNppesResults(nppesResults);
       }
     }
 
@@ -1075,6 +1216,7 @@ Only return valid JSON, no other text.`;
           if (nppesResults.length > 0) {
             console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (using broader specialty: ${broaderSpecialty})`);
             specialty = broaderSpecialty; // Update specialty for result display
+            nppesResults = filterActiveNppesResults(nppesResults);
           }
         }
       }
@@ -1093,6 +1235,7 @@ Only return valid JSON, no other text.`;
           if (nppesResults.length > 0) {
             console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (using related specialty: ${relatedSpecialty})`);
             specialty = relatedSpecialty; // Update specialty for result display
+            nppesResults = filterActiveNppesResults(nppesResults);
             break;
           }
         }
@@ -1112,6 +1255,7 @@ Only return valid JSON, no other text.`;
             if (nppesResults.length > 0) {
               console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (using alternative specialty: ${altSpecialty})`);
               specialty = altSpecialty; // Update specialty for result display
+              nppesResults = filterActiveNppesResults(nppesResults);
               break;
             }
           }
@@ -1128,6 +1272,7 @@ Only return valid JSON, no other text.`;
           state
         );
         console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (specialty + location, no name)`);
+        nppesResults = filterActiveNppesResults(nppesResults);
       }
       
       // If still no results and we have name, try name + location only
@@ -1140,6 +1285,7 @@ Only return valid JSON, no other text.`;
           state
         );
         console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (name + location, no specialty)`);
+        nppesResults = filterActiveNppesResults(nppesResults);
       }
     }
 
@@ -1198,6 +1344,11 @@ Only return valid JSON, no other text.`;
           npi: doctor.number,
         };
       });
+    }
+
+    // Enforce strict location filtering if a location was provided
+    if (physicians.length > 0 && (city || state || location)) {
+      physicians = filterPhysiciansByLocation(physicians, city, state, location);
     }
 
     // Handle no results with better error messages
