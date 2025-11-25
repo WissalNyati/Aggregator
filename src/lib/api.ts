@@ -71,23 +71,36 @@ async function apiRequest<T>(
     headers,
   });
 
+  // Parse response
+  const responseData = await response.json().catch(() => ({ error: 'Request failed' })) as ApiErrorPayload & { success?: boolean; message?: string };
+
+  // Check if backend returned success: false (from our proxy error handling)
+  if (responseData.success === false) {
+    const enrichedError = new Error(responseData.message || responseData.error || 'Service temporarily unavailable') as Error & {
+      status?: number;
+      code?: string;
+    };
+    enrichedError.status = 503; // Service Unavailable
+    if (responseData.code) {
+      enrichedError.code = responseData.code;
+    }
+    throw enrichedError;
+  }
+
   if (!response.ok) {
-    const errorData = (await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }))) as ApiErrorPayload;
-    const errorMessage = errorData.error || errorData.details || 'Request failed';
+    const errorMessage = responseData.error || responseData.details || 'Request failed';
     const enrichedError = new Error(errorMessage) as Error & {
       status?: number;
       code?: string;
     };
     enrichedError.status = response.status;
-    if (errorData.code) {
-      enrichedError.code = errorData.code;
+    if (responseData.code) {
+      enrichedError.code = responseData.code;
     }
     throw enrichedError;
   }
 
-  return response.json();
+  return responseData as T;
 }
 
 // Auth API
