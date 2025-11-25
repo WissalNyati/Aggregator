@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import { SearchHistory } from './SearchHistory';
 import { useSEO } from '../hooks/useSEO';
+import { AppointmentBookingCard } from './AppointmentBooking';
+import { ReviewScorecard } from './ReviewScorecard';
 
 interface SearchResult {
   query: string;
@@ -17,6 +19,10 @@ interface SearchResult {
     rating: number;
     years_experience: number;
     npi?: string;
+    acceptedInsurances?: string[];
+    telehealth?: boolean;
+    inPerson?: boolean;
+    afterHours?: boolean;
   }>;
   resultsCount: number;
   error?: string | null;
@@ -40,6 +46,10 @@ interface DoctorCardProps {
     rating: number;
     years_experience: number;
     npi?: string;
+    acceptedInsurances?: string[];
+    telehealth?: boolean;
+    inPerson?: boolean;
+    afterHours?: boolean;
   };
   index: number;
 }
@@ -56,6 +66,7 @@ interface DeepSearchData {
 }
 
 async function fetchDeepSearchInfo(npi?: string): Promise<DeepSearchData> {
+  void npi;
   // Placeholder for future API integration
   await new Promise((resolve) => setTimeout(resolve, 600));
   return {
@@ -223,6 +234,9 @@ function DoctorCard({ doctor, index }: DoctorCardProps) {
         {showDeepInfo && deepSearchData && (
           <DeepSearchPanel data={deepSearchData} />
         )}
+
+        <ReviewScorecard doctorNpi={doctor.npi} />
+        <AppointmentBookingCard doctor={doctor} />
       </div>
     </div>
   );
@@ -368,15 +382,17 @@ export function PhysicianSearch() {
         setQuery('');
         setShowHistory(false);
       }
-    } catch (error: any) {
-      console.error('Search error:', error);
+    } catch (error) {
+      const err = error as Error & { message?: string };
+      console.error('Search error:', err);
       
       let errorMessage = 'Search failed. Please try again.';
-      
-      if (error.message?.includes('quota') || error.message?.includes('429')) {
+
+      const message = err.message || '';
+      if (message.includes('quota') || message.includes('429')) {
         errorMessage = 'OpenAI API quota exceeded. The search will use fallback results, but they may be limited. Please check your OpenAI account billing.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (message) {
+        errorMessage = message;
       }
       
       if (page === 1) {
@@ -409,7 +425,7 @@ export function PhysicianSearch() {
       setAllResults(prev => [...prev, ...results.results]);
       setCurrentPage(nextPage);
       setHasMoreResults(results.pagination?.hasMore || false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Load more error:', error);
     } finally {
       setLoadingMore(false);

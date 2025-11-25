@@ -36,6 +36,12 @@ function removeToken(): void {
   localStorage.removeItem('auth_token');
 }
 
+type ApiErrorPayload = {
+  error?: string;
+  details?: string;
+  code?: string;
+};
+
 // API request helper
 async function apiRequest<T>(
   endpoint: string,
@@ -66,12 +72,19 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+    const errorData = (await response
+      .json()
+      .catch(() => ({ error: 'Request failed' }))) as ApiErrorPayload;
     const errorMessage = errorData.error || errorData.details || 'Request failed';
-    const error = new Error(errorMessage);
-    (error as any).status = response.status;
-    (error as any).code = errorData.code;
-    throw error;
+    const enrichedError = new Error(errorMessage) as Error & {
+      status?: number;
+      code?: string;
+    };
+    enrichedError.status = response.status;
+    if (errorData.code) {
+      enrichedError.code = errorData.code;
+    }
+    throw enrichedError;
   }
 
   return response.json();
@@ -111,7 +124,7 @@ export const authApi = {
     try {
       const user = await apiRequest<{ id: string; email: string }>('/auth/me');
       return user;
-    } catch (error) {
+    } catch {
       return null;
     }
   },
@@ -183,4 +196,126 @@ export const historyApi = {
     });
   },
 };
+
+// Appointment & Insurance APIs
+export type AppointmentSlot = {
+  id: string;
+  start: string;
+  end: string;
+  visitType: 'in_person' | 'telehealth';
+  status?: 'available' | 'booked';
+};
+
+export const appointmentsApi = {
+  async getAvailability(doctorNpi: string) {
+    return apiRequest<{
+      doctorNpi: string;
+      slots: AppointmentSlot[];
+      generatedAt: string;
+    }>('/appointments/availability', {
+      method: 'POST',
+      body: JSON.stringify({ doctorNpi }),
+    });
+  },
+
+  async bookAppointment(payload: {
+    doctorNpi: string;
+    slotId: string;
+    visitType: 'in_person' | 'telehealth';
+    reason: string;
+    insurancePlan?: string;
+    patientName: string;
+    patientEmail?: string;
+  }) {
+    return apiRequest<{
+      confirmationId: string;
+      doctorNpi: string;
+      slot: {
+        start: string;
+        end: string;
+        visitType: 'in_person' | 'telehealth';
+      };
+      status: string;
+      message: string;
+    }>('/appointments/book', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const insuranceApi = {
+  async verifyInsurance(doctorNpi: string, insurancePlan: string) {
+    return apiRequest<{
+      doctorNpi: string;
+      insurancePlan: string;
+      isInNetwork: boolean;
+      copay: number;
+      requiresReferral: boolean;
+      message: string;
+    }>('/insurance/verify', {
+      method: 'POST',
+      body: JSON.stringify({ doctorNpi, insurancePlan }),
+    });
+  },
+
+  async getPlans() {
+    return apiRequest<{
+      plans: string[];
+      message: string;
+    }>('/insurance/plans', {
+      method: 'GET',
+    });
+  },
+};
+
+export const reviewsApi = {
+  async getReviews(doctorNpi: string) {
+    return apiRequest<{
+      doctorNpi: string;
+      summary: {
+        averageRating: number;
+        waitTime: number;
+        bedsideManner: number;
+        staffFriendliness: number;
+        totalReviews: number;
+      };
+      reviews: Array<{
+        id: string;
+        rating: number;
+        waitTime: number;
+        bedsideManner: number;
+        staffFriendliness: number;
+        comments: string;
+        reviewerName: string;
+        createdAt: string;
+      }>;
+    }>(`/reviews/${doctorNpi}`, {
+      method: 'GET',
+    });
+  },
+
+  async submitReview(payload: {
+    doctorNpi: string;
+    rating: number;
+    waitTime?: number;
+    bedsideManner?: number;
+    staffFriendliness?: number;
+    comments: string;
+    reviewerName?: string;
+  }) {
+    return apiRequest<{
+      message: string;
+      review: {
+        id: string;
+        createdAt: string;
+      };
+    }>('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export { getToken, setToken, removeToken, API_URL };
 

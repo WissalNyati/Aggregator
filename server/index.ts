@@ -6,6 +6,9 @@ import { dirname, join } from 'path';
 import { authRoutes } from './routes/auth.js';
 import { searchRoutes } from './routes/search.js';
 import { historyRoutes } from './routes/history.js';
+import { appointmentRoutes } from './routes/appointments.js';
+import { insuranceRoutes } from './routes/insurance.js';
+import { reviewsRoutes } from './routes/reviews.js';
 import { initDatabase } from './db/index.js';
 
 // Get the directory of the current module
@@ -86,6 +89,18 @@ app.get('/api', (req, res) => {
         delete: 'DELETE /api/history/:id',
         clear: 'DELETE /api/history',
       },
+      appointments: {
+        availability: 'POST /api/appointments/availability',
+        book: 'POST /api/appointments/book',
+      },
+      insurance: {
+        verify: 'POST /api/insurance/verify',
+        plans: 'GET /api/insurance/plans',
+      },
+      reviews: {
+        list: 'GET /api/reviews/:doctorNpi',
+        create: 'POST /api/reviews',
+      },
     },
   });
 });
@@ -94,6 +109,9 @@ app.get('/api', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/insurance', insuranceRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
