@@ -71,39 +71,72 @@ exports.handler = async (event) => {
       fetchOptions.body = event.body;
     }
 
-    // Make request to backend
-    const response = await fetch(backendURL, fetchOptions);
-    const data = await response.text();
+    // Make request to backend with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
     
-    // Try to parse as JSON
-    let body;
     try {
-      body = JSON.parse(data);
-    } catch {
-      body = data;
-    }
+      const response = await fetch(backendURL, {
+        ...fetchOptions,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.text();
+      
+      // Try to parse as JSON
+      let body;
+      try {
+        body = JSON.parse(data);
+      } catch {
+        body = data;
+      }
 
-    return {
-      statusCode: response.status,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Content-Type': response.headers.get('content-type') || 'application/json',
-      },
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    };
+      return {
+        statusCode: response.status,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Content-Type': response.headers.get('content-type') || 'application/json',
+        },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        console.error('[api-proxy] Request timeout:', backendURL);
+        return {
+          statusCode: 504,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            error: 'Request timeout',
+            message: 'Backend server did not respond in time'
+          }),
+        };
+      }
+      throw fetchError;
+    }
   } catch (error) {
     console.error('[api-proxy] Error:', error);
+    console.error('[api-proxy] Backend URL:', BACKEND_BASE_URL);
+    console.error('[api-proxy] Path:', event.queryStringParameters?.path);
+    
     return {
-      statusCode: 500,
+      statusCode: 502,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        error: 'Failed to fetch from backend',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Bad Gateway',
+        message: error instanceof Error ? error.message : 'Failed to connect to backend server',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }),
     };
   }
