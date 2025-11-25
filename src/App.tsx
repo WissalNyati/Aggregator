@@ -11,19 +11,19 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
+  // Don't block on loading - show content immediately
+  // Auth check happens in background
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <div className="text-center glass-card rounded-3xl p-12 shadow-professional-lg animate-scale-in">
-          <div className="spinner-professional mx-auto mb-6" />
-          <p className="text-body font-semibold text-lg">Loading...</p>
-          <p className="text-body text-sm mt-2">Please wait while we verify your session</p>
-        </div>
-      </div>
-    );
+    // Show content with minimal delay
+    return <>{children}</>;
   }
 
-  return user ? <>{children}</> : <Navigate to="/" replace />;
+  // If no user after loading, redirect to home (which will show auth form)
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function NotFound() {
