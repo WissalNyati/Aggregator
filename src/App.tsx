@@ -1,9 +1,13 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AuthForm } from './components/AuthForm';
 import { PhysicianSearch } from './components/PhysicianSearch';
-import { Loader2 } from 'lucide-react';
+import { DoctorProfile } from './components/DoctorProfile';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { SettingsPage } from './components/SettingsPage';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
-function App() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -18,7 +22,51 @@ function App() {
     );
   }
 
-  return user ? <PhysicianSearch /> : <AuthForm />;
+  return user ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <PhysicianSearch />
+              <PWAInstallPrompt />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/doctor/:npi"
+          element={
+            <ProtectedRoute>
+              <DoctorProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AnalyticsDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/auth" element={<AuthForm />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;

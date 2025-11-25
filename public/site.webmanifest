@@ -1,16 +1,21 @@
 {
-  "name": "AI Physician Search Platform",
+  "name": "YoDoc - Find Doctors Near You",
   "short_name": "YoDoc",
-  "description": "Search for physicians using AI-powered natural language queries",
+  "description": "Find real doctors with phone numbers, addresses, and ratings. Book appointments and verify insurance.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ],
   "theme_color": "#2563eb",
   "background_color": "#ffffff",
-  "display": "standalone"
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["health", "medical", "lifestyle"]
 }
 

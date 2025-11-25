@@ -9,6 +9,9 @@ import { historyRoutes } from './routes/history.js';
 import { appointmentRoutes } from './routes/appointments.js';
 import { insuranceRoutes } from './routes/insurance.js';
 import { reviewsRoutes } from './routes/reviews.js';
+import { analyticsRoutes } from './routes/analytics.js';
+import { monetizationRoutes } from './routes/monetization.js';
+import { securityHeaders, rateLimit } from './middleware/security.js';
 import { initDatabase } from './db/index.js';
 
 // Get the directory of the current module
@@ -69,6 +72,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Security middleware
+app.use(securityHeaders);
+
+// Rate limiting
+app.use('/api/', rateLimit(100, 15 * 60 * 1000)); // 100 requests per 15 minutes
+app.use('/api/search/', rateLimit(20, 60 * 1000)); // 20 searches per minute
+app.use('/api/appointments/', rateLimit(10, 60 * 1000)); // 10 bookings per minute
+
 // API root endpoint
 app.get('/api', (req, res) => {
   res.json({
@@ -101,6 +112,20 @@ app.get('/api', (req, res) => {
         list: 'GET /api/reviews/:doctorNpi',
         create: 'POST /api/reviews',
       },
+      analytics: {
+        metrics: 'GET /api/analytics/metrics?timeRange=7d|30d|90d',
+      },
+      monetization: {
+        subscription: 'GET /api/monetization/subscription',
+        upgrade: 'POST /api/monetization/subscription/upgrade',
+        referral: {
+          generate: 'POST /api/monetization/referral/generate',
+          apply: 'POST /api/monetization/referral/apply',
+          stats: 'GET /api/monetization/referral/stats',
+        },
+        practice: 'GET /api/monetization/practice/features',
+        enterprise: 'POST /api/monetization/enterprise/inquiry',
+      },
     },
   });
 });
@@ -112,6 +137,8 @@ app.use('/api/history', historyRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/insurance', insuranceRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/monetization', monetizationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

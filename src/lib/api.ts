@@ -317,5 +317,104 @@ export const reviewsApi = {
   },
 };
 
+export const analyticsApi = {
+  async getMetrics(timeRange: '7d' | '30d' | '90d' = '30d') {
+    return apiRequest<{
+      patientMetrics: {
+        totalSearches: number;
+        searchConversionRate: number;
+        appointmentBookings: number;
+        patientRetentionRate: number;
+        geographicDemand: Array<{ location: string; count: number }>;
+      };
+      doctorMetrics: {
+        profileCompletions: number;
+        patientAcquisitionCost: number;
+        averageSatisfactionScore: number;
+        bookingUtilization: number;
+        topDoctors: Array<{ name: string; views: number; bookings: number }>;
+      };
+      revenueMetrics: {
+        totalRevenue: number;
+        monthlyRecurringRevenue: number;
+        averageRevenuePerUser: number;
+        revenueGrowth: number;
+      };
+    }>(`/analytics/metrics?timeRange=${timeRange}`, {
+      method: 'GET',
+    });
+  },
+};
+
+export const monetizationApi = {
+  async getSubscription() {
+    return apiRequest<{
+      id: string;
+      userId: string;
+      tier: 'free' | 'premium' | 'enterprise';
+      features: string[];
+      referralCode?: string;
+    }>('/monetization/subscription', {
+      method: 'GET',
+    });
+  },
+
+  async upgradeSubscription(tier: 'premium' | 'enterprise') {
+    return apiRequest<{
+      message: string;
+      subscription: {
+        id: string;
+        userId: string;
+        tier: 'free' | 'premium' | 'enterprise';
+        features: string[];
+      };
+    }>('/monetization/subscription/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ tier }),
+    });
+  },
+
+  async generateReferralCode() {
+    return apiRequest<{
+      referralCode: string;
+      referralLink: string;
+      message: string;
+    }>('/monetization/referral/generate', {
+      method: 'POST',
+    });
+  },
+
+  async applyReferralCode(referralCode: string) {
+    return apiRequest<{
+      message: string;
+      subscription: {
+        id: string;
+        userId: string;
+        tier: 'free' | 'premium' | 'enterprise';
+        features: string[];
+      };
+    }>('/monetization/referral/apply', {
+      method: 'POST',
+      body: JSON.stringify({ referralCode }),
+    });
+  },
+
+  async getReferralStats() {
+    return apiRequest<{
+      referralCode: string | null;
+      referralLink: string;
+      totalReferrals: number;
+      activeReferrals: number;
+      rewards: Array<{
+        referredId: string;
+        reward: string;
+        date: string;
+      }>;
+    }>('/monetization/referral/stats', {
+      method: 'GET',
+    });
+  },
+};
+
 export { getToken, setToken, removeToken, API_URL };
 

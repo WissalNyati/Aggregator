@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle, Phone, MapPin, Star, Clock, ChevronDown, Loader2, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle, Phone, MapPin, Star, Clock, ChevronDown, Loader2, ExternalLink, BarChart3, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import { SearchHistory } from './SearchHistory';
@@ -140,6 +141,7 @@ function DeepSearchPanel({ data }: { data: DeepSearchData }) {
 }
 
 function DoctorCard({ doctor, index }: DoctorCardProps) {
+  const navigate = useNavigate();
   const [showDeepInfo, setShowDeepInfo] = useState(false);
   const [deepSearchData, setDeepSearchData] = useState<DeepSearchData | null>(null);
   const [deepSearchLoading, setDeepSearchLoading] = useState(false);
@@ -233,6 +235,16 @@ function DoctorCard({ doctor, index }: DoctorCardProps) {
         )}
         {showDeepInfo && deepSearchData && (
           <DeepSearchPanel data={deepSearchData} />
+        )}
+
+        {doctor.npi && (
+          <button
+            onClick={() => navigate(`/doctor/${doctor.npi}`)}
+            className="w-full mt-4 btn-secondary text-sm justify-center flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4" />
+            View Full Profile
+          </button>
         )}
 
         <ReviewScorecard doctorNpi={doctor.npi} />
@@ -549,6 +561,20 @@ export function PhysicianSearch() {
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/analytics')}
+                className="btn-secondary text-sm py-2 px-4 hidden sm:flex items-center gap-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Analytics
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                className="btn-secondary text-sm py-2 px-4 hidden sm:flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
               <div className="hidden sm:flex items-center gap-2 text-sm text-body px-3 py-2 rounded-lg bg-white/50">
                 <User className="w-4 h-4" />
                 <span className="max-w-[150px] truncate">{user?.email}</span>
