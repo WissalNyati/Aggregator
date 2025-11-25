@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, MapPin, Star, Clock, ShieldCheck, Video, Building2, GraduationCap, Award, Languages, Wheelchair } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Star, Clock, ShieldCheck, Video, Building2, GraduationCap, Award, Languages, Accessibility } from 'lucide-react';
 import { AppointmentBookingCard } from './AppointmentBooking';
 import { ReviewScorecard } from './ReviewScorecard';
 
@@ -278,7 +278,7 @@ export function DoctorProfile() {
               {doctor.accessibility && doctor.accessibility.length > 0 && (
                 <div className="glass-card rounded-2xl p-6">
                   <h2 className="text-heading text-lg mb-4 flex items-center gap-2">
-                    <Wheelchair className="w-5 h-5 text-blue-600" />
+                    <Accessibility className="w-5 h-5 text-blue-600" />
                     Accessibility
                   </h2>
                   <ul className="space-y-2">
