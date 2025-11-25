@@ -132,6 +132,15 @@ export const authApi = {
   signOut() {
     removeToken();
   },
+
+  async isAdmin() {
+    try {
+      const result = await apiRequest<{ isAdmin: boolean }>('/auth/is-admin');
+      return result.isAdmin;
+    } catch {
+      return false;
+    }
+  },
 };
 
 // Search API

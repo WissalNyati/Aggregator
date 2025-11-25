@@ -21,12 +21,27 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     next();
-  } catch (error) {
+  } catch {
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 }
 
 export function generateToken(userId: string, email: string): string {
   return jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+// Admin check middleware - checks if user email is in admin list
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.userEmail) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (!ADMIN_EMAILS.includes(req.userEmail.toLowerCase())) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  next();
 }
 

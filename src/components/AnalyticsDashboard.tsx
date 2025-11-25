@@ -16,7 +16,8 @@ interface AnalyticsData {
     patientAcquisitionCost: number;
     averageSatisfactionScore: number;
     bookingUtilization: number;
-    topDoctors: Array<{ name: string; views: number; bookings: number }>;
+    topDoctors?: Array<{ name: string; views: number; bookings: number }>;
+    topSpecialties?: Array<{ specialty: string; searches: number }>;
   };
   revenueMetrics: {
     totalRevenue: number;
@@ -32,44 +33,23 @@ export function AnalyticsDashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchAnalytics = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const data = await analyticsApi.getMetrics(timeRange);
         setAnalytics(data);
-      } catch (error) {
+      } catch (err) {
+        const error = err as Error & { status?: number };
         console.error('Failed to load analytics:', error);
-        // Mock data for demo
-        setAnalytics({
-          patientMetrics: {
-            totalSearches: 1247,
-            searchConversionRate: 23.5,
-            appointmentBookings: 293,
-            patientRetentionRate: 67.8,
-            geographicDemand: [
-              { location: 'Seattle, WA', count: 342 },
-              { location: 'Tacoma, WA', count: 198 },
-              { location: 'Bellevue, WA', count: 156 },
-            ],
-          },
-          doctorMetrics: {
-            profileCompletions: 89,
-            patientAcquisitionCost: 45.50,
-            averageSatisfactionScore: 4.6,
-            bookingUtilization: 72.3,
-            topDoctors: [
-              { name: 'Dr. Mark L. Nelson', views: 234, bookings: 18 },
-              { name: 'Dr. Sarah Chen', views: 189, bookings: 15 },
-              { name: 'Dr. James Wilson', views: 167, bookings: 12 },
-            ],
-          },
-          revenueMetrics: {
-            totalRevenue: 12500,
-            monthlyRecurringRevenue: 8500,
-            averageRevenuePerUser: 42.50,
-            revenueGrowth: 15.3,
-          },
-        });
+        if (error.status === 403) {
+          setError('Access denied. Admin privileges required.');
+        } else {
+          setError('Failed to load analytics data. Please try again later.');
+        }
       } finally {
         setLoading(false);
       }
@@ -84,6 +64,23 @@ export function AnalyticsDashboard() {
         <div className="text-center glass-card rounded-3xl p-12 shadow-professional-lg">
           <div className="spinner-professional mx-auto mb-6" />
           <p className="text-body font-semibold">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
+        <div className="text-center glass-card rounded-3xl p-12 shadow-professional-lg max-w-md">
+          <div className="text-red-600 mb-4">
+            <Activity className="w-12 h-12 mx-auto" />
+          </div>
+          <h2 className="text-heading text-xl mb-2">Access Denied</h2>
+          <p className="text-body mb-6">{error}</p>
+          <button onClick={() => navigate(-1)} className="btn-primary">
+            Go Back
+          </button>
         </div>
       </div>
     );
@@ -207,62 +204,68 @@ export function AnalyticsDashboard() {
         </div>
 
         {/* Geographic Demand */}
-        <div className="glass-card-strong rounded-2xl p-6 shadow-professional mb-8">
-          <h2 className="text-heading text-xl mb-6 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            Geographic Demand
-          </h2>
-          <div className="space-y-3">
-            {analytics.patientMetrics.geographicDemand.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <span className="text-body font-medium">{item.location}</span>
-                <div className="flex items-center gap-3">
-                  <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-teal-500"
-                      style={{
-                        width: `${(item.count / analytics.patientMetrics.geographicDemand[0].count) * 100}%`,
-                      }}
-                    />
+        {analytics.patientMetrics.geographicDemand && analytics.patientMetrics.geographicDemand.length > 0 ? (
+          <div className="glass-card-strong rounded-2xl p-6 shadow-professional mb-8">
+            <h2 className="text-heading text-xl mb-6 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+              Geographic Demand
+            </h2>
+            <div className="space-y-3">
+              {analytics.patientMetrics.geographicDemand.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <span className="text-body font-medium">{item.location}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-teal-500"
+                        style={{
+                          width: `${(item.count / analytics.patientMetrics.geographicDemand[0].count) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-body font-semibold w-12 text-right">{item.count}</span>
                   </div>
-                  <span className="text-body font-semibold w-12 text-right">{item.count}</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="glass-card-strong rounded-2xl p-6 shadow-professional mb-8">
+            <h2 className="text-heading text-xl mb-6 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+              Geographic Demand
+            </h2>
+            <p className="text-body text-sm text-gray-500">No location data available for the selected time range.</p>
+          </div>
+        )}
 
-        {/* Top Doctors */}
-        <div className="glass-card-strong rounded-2xl p-6 shadow-professional">
-          <h2 className="text-heading text-xl mb-6 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            Top Performing Doctors
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-subheading text-sm">Doctor</th>
-                  <th className="text-right py-3 px-4 text-subheading text-sm">Profile Views</th>
-                  <th className="text-right py-3 px-4 text-subheading text-sm">Bookings</th>
-                  <th className="text-right py-3 px-4 text-subheading text-sm">Conversion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.doctorMetrics.topDoctors.map((doctor, idx) => (
-                  <tr key={idx} className="border-b border-gray-100">
-                    <td className="py-3 px-4 text-body font-medium">{doctor.name}</td>
-                    <td className="py-3 px-4 text-body text-right">{doctor.views}</td>
-                    <td className="py-3 px-4 text-body text-right">{doctor.bookings}</td>
-                    <td className="py-3 px-4 text-body text-right font-semibold">
-                      {((doctor.bookings / doctor.views) * 100).toFixed(1)}%
-                    </td>
+        {/* Top Specialties */}
+        {analytics.doctorMetrics.topSpecialties && analytics.doctorMetrics.topSpecialties.length > 0 && (
+          <div className="glass-card-strong rounded-2xl p-6 shadow-professional">
+            <h2 className="text-heading text-xl mb-6 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              Top Searched Specialties
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-subheading text-sm">Specialty</th>
+                    <th className="text-right py-3 px-4 text-subheading text-sm">Total Searches</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {analytics.doctorMetrics.topSpecialties.map((specialty, idx) => (
+                    <tr key={idx} className="border-b border-gray-100">
+                      <td className="py-3 px-4 text-body font-medium">{specialty.specialty}</td>
+                      <td className="py-3 px-4 text-body text-right font-semibold">{specialty.searches}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

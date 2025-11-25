@@ -104,6 +104,18 @@ authRoutes.post('/signin', async (req, res) => {
   }
 });
 
+// Check if user is admin
+authRoutes.get('/is-admin', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const isAdmin = req.userEmail && ADMIN_EMAILS.includes(req.userEmail.toLowerCase());
+    res.json({ isAdmin: !!isAdmin });
+  } catch (err) {
+    console.error('Admin check error:', err);
+    res.status(500).json({ error: 'Failed to check admin status' });
+  }
+});
+
 // Get current user
 authRoutes.get('/me', async (req, res) => {
   try {
@@ -131,7 +143,7 @@ authRoutes.get('/me', async (req, res) => {
       id: user.id,
       email: user.email,
     });
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
 });

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, LogOut, User, Stethoscope, Copy, Check, AlertCircle, Phone, MapPin, Star, Clock, ChevronDown, Loader2, ExternalLink, BarChart3, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
+import { useAdmin } from '../hooks/useAdmin';
 import { SearchHistory } from './SearchHistory';
 import { useSEO } from '../hooks/useSEO';
 import { AppointmentBookingCard } from './AppointmentBooking';
@@ -296,6 +297,7 @@ const DEFAULT_RADIUS_METERS = 25000;
 export function PhysicianSearch() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
   const { addToHistory, saveSearchResults, getSearchResults, refreshHistory } = useSearchHistory();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -562,13 +564,15 @@ export function PhysicianSearch() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/analytics')}
-                className="btn-secondary text-sm py-2 px-4 hidden sm:flex items-center gap-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Analytics
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => navigate('/analytics')}
+                  className="btn-secondary text-sm py-2 px-4 hidden sm:flex items-center gap-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Analytics
+                </button>
+              )}
               <button
                 onClick={() => navigate('/settings')}
                 className="btn-secondary text-sm py-2 px-4 hidden sm:flex items-center gap-2"
