@@ -182,8 +182,12 @@ body {
   background: rgba(255, 255, 255, 1);
 }
 
+.search-guidance {
+  @apply bg-blue-50/50 border-blue-100;
+}
+
 .search-guidance ul li strong {
-  @apply text-gray-900;
+  @apply text-blue-700;
 }
 
 .map-section .map-placeholder {
@@ -297,5 +301,9 @@ html {
 }
 
 .password-toggle {
-  @apply absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-blue-600;
+  @apply absolute right-4 top-1/2 transform -translate-y-1/2;
+  @apply text-sm font-medium text-blue-600 hover:text-blue-700;
+  @apply transition-colors cursor-pointer;
+  @apply flex items-center justify-center w-8 h-8 rounded-full;
+  @apply hover:bg-blue-50;
 }
