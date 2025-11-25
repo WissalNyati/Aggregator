@@ -104,21 +104,25 @@ analyticsRoutes.get('/metrics', authenticateToken, requireAdmin, async (req: Aut
         appointmentBookings,
         patientRetentionRate: Math.round(patientRetentionRate * 10) / 10,
         uniqueUsers,
-        geographicDemand: geographicData.map((row: { location: string; count: number }) => ({
-          location: row.location,
-          count: Number(row.count),
-        })),
+        geographicDemand: Array.isArray(geographicData)
+          ? geographicData.map((row: Record<string, any>) => ({
+              location: row.location,
+              count: Number(row.count),
+            }))
+          : [],
       },
       doctorMetrics: {
         profileCompletions: 0, // TODO: Implement when doctor profiles are added
         patientAcquisitionCost: 0, // TODO: Calculate from marketing spend
         averageSatisfactionScore: 0, // TODO: Calculate from reviews
-        bookingUtilization: appointmentBookings > 0 ? Math.round((appointmentBookings / totalSearches) * 100 * 10) / 10 : 0,
+        bookingUtilization: totalSearches > 0 ? Math.round((appointmentBookings / totalSearches) * 100 * 10) / 10 : 0,
         topDoctors: [], // TODO: Implement when doctor view tracking is added
-        topSpecialties: topSpecialties.map((row: { specialty: string; count: number }) => ({
-          specialty: row.specialty,
-          searches: Number(row.count),
-        })),
+        topSpecialties: Array.isArray(topSpecialties)
+          ? topSpecialties.map((row: Record<string, any>) => ({
+              specialty: row.specialty,
+              searches: Number(row.count),
+            }))
+          : [],
       },
       revenueMetrics: {
         totalRevenue: 0, // TODO: Calculate from subscriptions

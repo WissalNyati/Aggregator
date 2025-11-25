@@ -75,7 +75,7 @@ async function apiRequest<T>(
     const errorData = (await response
       .json()
       .catch(() => ({ error: 'Request failed' }))) as ApiErrorPayload;
-    const errorMessage = errorData.error || errorData.details || errorData.message || 'Request failed';
+    const errorMessage = errorData.error || errorData.details || 'Request failed';
     const enrichedError = new Error(errorMessage) as Error & {
       status?: number;
       code?: string;
