@@ -1071,89 +1071,125 @@ searchRoutes.post('/physicians', authenticateToken, async (req: AuthRequest, res
     console.log('Parsed Specialty:', specialty);
     console.log('Parsed Location:', location);
 
-    // Try OpenAI extraction as enhancement (not required)
+    // GPT-FIRST STRATEGY: Use GPT to find potential doctors, then verify with NPPES
+    let gptSuggestedDoctors: Array<{
+      firstName: string;
+      lastName: string;
+      specialty?: string;
+      location?: string;
+      confidence: number;
+    }> = [];
+    
     if (process.env.OPENAI_API_KEY) {
       try {
-        console.log('=== OPENAI API DEBUG ===');
-        console.log('OpenAI API Key Present:', !!process.env.OPENAI_API_KEY);
-        console.log('OpenAI API Key Length:', process.env.OPENAI_API_KEY?.length || 0);
+        console.log('=== GPT-FIRST DOCTOR SEARCH ===');
+        console.log('Query:', query);
         
-        const extractionPrompt = `You are a medical search assistant. Extract the following information from this search query: "${query}"
+        const gptSearchPrompt = `You are a medical search assistant. Based on this search query: "${query}"
 
-Return a JSON object with:
-- firstName: First name if a person's name is mentioned (e.g., "John" from "Dr. John Smith" or "Mark" from "Mark L Nelson"). If not specified, return null
-- lastName: Last name if a person's name is mentioned (e.g., "Smith" from "Dr. John Smith" or "Nelson" from "Mark L Nelson"). If not specified, return null
-- specialty: The medical specialty mentioned (e.g., "Cardiology", "Retina Surgery", "Ophthalmology", "Primary Care"). If not specified, return null
-- location: The location mentioned (city, state, or "City, State" format, e.g., "Tacoma, Washington" or "Tacoma Washington"). If not specified, return null
+Analyze the query and suggest potential doctors that might match. Return a JSON array of doctor candidates with:
+- firstName: First name (required)
+- lastName: Last name (required)  
+- specialty: Medical specialty if mentioned (e.g., "Ophthalmology", "Retina Surgery", "Cardiology")
+- location: Location if mentioned (city, state format like "Tukwila, WA" or "Seattle, Washington")
+- confidence: Your confidence level 0-100 that this doctor exists and matches the query
 
-Only return valid JSON, no other text.`;
+IMPORTANT:
+1. If a specific doctor name is mentioned (e.g., "Andrew Kopstein"), include that exact name
+2. If only specialty + location is mentioned, suggest 2-3 potential doctor names that might exist in that area
+3. Normalize location names (e.g., "Tukwilla" → "Tukwila, WA")
+4. Normalize specialty terms (e.g., "eye surgeon" → "Ophthalmology")
+5. Return an array even if only one doctor is found
 
-        console.log('OpenAI Extraction Prompt:', extractionPrompt);
-        
+Example response:
+[
+  {
+    "firstName": "Andrew",
+    "lastName": "Kopstein",
+    "specialty": "Ophthalmology",
+    "location": "Tukwila, WA",
+    "confidence": 95
+  }
+]
+
+Return ONLY valid JSON array, no other text.`;
+
         const startTime = Date.now();
-        const extractionResponse = await openai.chat.completions.create({
+        const gptResponse = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that extracts structured data from search queries. Always return valid JSON only.',
+              content: 'You are a medical search assistant. Always return valid JSON arrays only. Help users find doctors by suggesting potential matches based on their search queries.',
             },
             {
               role: 'user',
-              content: extractionPrompt,
+              content: gptSearchPrompt,
             },
           ],
-          temperature: 0.3,
-          max_tokens: 200,
+          temperature: 0.2, // Lower temperature for more consistent results
+          max_tokens: 500,
         });
         const responseTime = Date.now() - startTime;
         
-        console.log('OpenAI API Response Time:', responseTime + 'ms');
-        console.log('OpenAI Model Used:', extractionResponse.model);
-        console.log('OpenAI Usage:', extractionResponse.usage);
+        console.log('GPT Search Response Time:', responseTime + 'ms');
+        console.log('GPT Model Used:', gptResponse.model);
         
-        const rawContent = extractionResponse.choices[0].message.content || '{}';
-        console.log('OpenAI Raw Response:', rawContent);
+        const rawContent = gptResponse.choices[0].message.content || '[]';
+        console.log('GPT Raw Response:', rawContent);
         
-        const extractedData = JSON.parse(rawContent);
-        console.log('OpenAI Parsed Data:', extractedData);
-        
-        // Use OpenAI results if they're better (non-null values)
-        if (extractedData.firstName || extractedData.lastName) {
-          extractedName = {
-            firstName: extractedData.firstName || extractedName.firstName,
-            lastName: extractedData.lastName || extractedName.lastName,
-          };
-          console.log('Updated name from OpenAI:', extractedName);
-        }
-        if (extractedData.specialty) {
-          // Use our improved specialty matching to normalize OpenAI's specialty extraction
-          const normalizedSpecialty = extractSpecialtyFromQuery(extractedData.specialty);
-          if (normalizedSpecialty) {
-            specialty = normalizedSpecialty;
-            console.log('Updated specialty from OpenAI (normalized):', specialty);
+        // Parse GPT response
+        let parsedContent: any;
+        try {
+          parsedContent = JSON.parse(rawContent);
+        } catch (parseError) {
+          // Try to extract JSON from markdown code blocks
+          const jsonMatch = rawContent.match(/```(?:json)?\s*(\[.*?\])\s*```/s);
+          if (jsonMatch) {
+            parsedContent = JSON.parse(jsonMatch[1]);
           } else {
-            // If OpenAI returned a specialty we don't recognize, try to match it
-            specialty = extractedData.specialty;
-            console.log('Updated specialty from OpenAI (raw):', specialty);
+            throw new Error('Failed to parse GPT response as JSON');
           }
         }
-        if (extractedData.location) {
-          location = normalizeLocationString(extractedData.location);
-          console.log('Updated location from OpenAI:', location);
+        
+        // Ensure it's an array
+        if (Array.isArray(parsedContent)) {
+          gptSuggestedDoctors = parsedContent.filter((doc: any) => 
+            doc.firstName && doc.lastName && doc.confidence >= 50
+          );
+          console.log(`GPT suggested ${gptSuggestedDoctors.length} potential doctors:`, gptSuggestedDoctors);
+        } else if (parsedContent.firstName && parsedContent.lastName) {
+          // Single doctor object instead of array
+          gptSuggestedDoctors = [parsedContent];
+          console.log('GPT suggested 1 potential doctor:', gptSuggestedDoctors);
         }
-      } catch (openaiError: any) {
-        console.error('=== OPENAI API ERROR ===');
-        console.error('Error Type:', openaiError.constructor.name);
-        console.error('Error Message:', openaiError.message);
-        console.error('Error Code:', (openaiError as any).code);
-        console.error('Error Status:', (openaiError as any).status);
-        console.error('Error Stack:', openaiError.stack);
-        console.warn('OpenAI extraction failed, using regex parsing:', openaiError.message);
+        
+        // Also extract structured data for fallback NPPES search
+        if (gptSuggestedDoctors.length > 0) {
+          const topSuggestion = gptSuggestedDoctors[0];
+          extractedName = {
+            firstName: topSuggestion.firstName || extractedName.firstName,
+            lastName: topSuggestion.lastName || extractedName.lastName,
+          };
+          if (topSuggestion.specialty) {
+            const normalizedSpecialty = extractSpecialtyFromQuery(topSuggestion.specialty);
+            specialty = normalizedSpecialty || topSuggestion.specialty;
+          }
+          if (topSuggestion.location) {
+            location = enhancedLocationProcessing(topSuggestion.location);
+          }
+          console.log('Updated search params from GPT:', { extractedName, specialty, location });
+        }
+      } catch (gptError: any) {
+        console.error('=== GPT SEARCH ERROR ===');
+        console.error('Error Type:', gptError.constructor.name);
+        console.error('Error Message:', gptError.message);
+        console.error('Error Stack:', gptError.stack);
+        console.warn('GPT search failed, falling back to regex parsing:', gptError.message);
         // Continue with regex-based parsing results
       }
     } else {
-      console.log('OpenAI API key not configured, skipping OpenAI extraction');
+      console.log('OpenAI API key not configured, skipping GPT-first search');
     }
 
     // Parse location into city and state
@@ -1191,31 +1227,136 @@ Only return valid JSON, no other text.`;
       });
     }
 
-    // Multi-stage fallback search strategy
+    // GPT-FIRST VERIFICATION: Verify GPT suggestions in NPPES
     let nppesResults: NPPESProvider[] = [];
-    let searchAttempt = 0;
-    const maxAttempts = 4;
-
-    // Expand specialty search to include related specialties
-    const expandedSpecialties = specialty ? expandSpecialtySearch(specialty) : [specialty].filter(Boolean) as string[];
-    console.log('=== SPECIALTY EXPANSION ===');
-    console.log('Original Specialty:', specialty);
-    console.log('Expanded Specialties:', expandedSpecialties);
-
-    // Attempt 1: Exact match with all parameters (try original specialty first)
-    searchAttempt = 1;
-    nppesResults = await searchNPPES(
-      extractedName.firstName,
-      extractedName.lastName,
-      specialty,
-      city,
-      state
-    );
-    console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results`);
-    nppesResults = filterActiveNppesResults(nppesResults);
+    let verifiedDoctors: NPPESProvider[] = [];
     
-    // If no results and we have expanded specialties, try them
-    if (nppesResults.length === 0 && expandedSpecialties.length > 1) {
+    if (gptSuggestedDoctors.length > 0) {
+      console.log('=== VERIFYING GPT SUGGESTIONS IN NPPES ===');
+      
+      // Verify each GPT-suggested doctor in NPPES
+      for (const gptDoctor of gptSuggestedDoctors) {
+        console.log(`Verifying: ${gptDoctor.firstName} ${gptDoctor.lastName}...`);
+        
+        // Parse location from GPT suggestion
+        const gptLocation = gptDoctor.location ? enhancedLocationProcessing(gptDoctor.location) : location;
+        const { city: gptCity, state: gptState } = parseLocation(gptLocation);
+        
+        // Try multiple search strategies for this doctor
+        let doctorResults: NPPESProvider[] = [];
+        
+        // Strategy 1: Exact match with all parameters
+        doctorResults = await searchNPPES(
+          gptDoctor.firstName,
+          gptDoctor.lastName,
+          gptDoctor.specialty || specialty,
+          gptCity || city,
+          gptState || state
+        );
+        doctorResults = filterActiveNppesResults(doctorResults);
+        
+        // Strategy 2: Last name only (handles "A. Kopstein" variations)
+        if (doctorResults.length === 0) {
+          doctorResults = await searchNPPES(
+            null,
+            gptDoctor.lastName,
+            gptDoctor.specialty || specialty,
+            gptCity || city,
+            gptState || state
+          );
+          doctorResults = filterActiveNppesResults(doctorResults);
+          
+          // Filter by fuzzy name matching
+          if (doctorResults.length > 0) {
+            const searchFullName = `${gptDoctor.firstName} ${gptDoctor.lastName}`;
+            doctorResults = doctorResults.filter(doctor => {
+              const doctorFullName = `${doctor.basic.first_name || ''} ${doctor.basic.last_name || ''}`.trim();
+              const match = advancedNameMatching(searchFullName, doctorFullName);
+              return match.match && match.score >= 70;
+            });
+          }
+        }
+        
+        // Strategy 3: Without location constraint
+        if (doctorResults.length === 0) {
+          doctorResults = await searchNPPES(
+            gptDoctor.firstName,
+            gptDoctor.lastName,
+            gptDoctor.specialty || specialty,
+            null,
+            null
+          );
+          doctorResults = filterActiveNppesResults(doctorResults);
+          
+          // Filter by location and name matching
+          if (doctorResults.length > 0 && (gptCity || gptState || city || state)) {
+            const searchFullName = `${gptDoctor.firstName} ${gptDoctor.lastName}`;
+            doctorResults = doctorResults.filter(doctor => {
+              const doctorFullName = `${doctor.basic.first_name || ''} ${doctor.basic.last_name || ''}`.trim();
+              const nameMatch = advancedNameMatching(searchFullName, doctorFullName);
+              
+              if (!nameMatch.match || nameMatch.score < 70) return false;
+              
+              // Check location match
+              const primaryAddress = doctor.addresses.find(addr => addr.address_purpose === 'LOCATION') || doctor.addresses[0];
+              const doctorCity = primaryAddress?.city?.toLowerCase() || '';
+              const doctorState = primaryAddress?.state?.toLowerCase() || '';
+              const searchCity = (gptCity || city)?.toLowerCase() || '';
+              const searchState = (gptState || state)?.toLowerCase() || '';
+              
+              const cityMatch = !searchCity || doctorCity.includes(searchCity) || searchCity.includes(doctorCity);
+              const stateMatch = !searchState || doctorState === searchState;
+              
+              return cityMatch && stateMatch;
+            });
+          }
+        }
+        
+        if (doctorResults.length > 0) {
+          console.log(`✓ Verified ${gptDoctor.firstName} ${gptDoctor.lastName}: Found ${doctorResults.length} matches in NPPES`);
+          verifiedDoctors.push(...doctorResults);
+        } else {
+          console.log(`✗ Could not verify ${gptDoctor.firstName} ${gptDoctor.lastName} in NPPES`);
+        }
+      }
+      
+      // Remove duplicates from verified doctors
+      const seenNpis = new Set<string>();
+      verifiedDoctors = verifiedDoctors.filter(doctor => {
+        if (seenNpis.has(doctor.number)) return false;
+        seenNpis.add(doctor.number);
+        return true;
+      });
+      
+      nppesResults = verifiedDoctors;
+      console.log(`=== GPT VERIFICATION COMPLETE ===`);
+      console.log(`Total verified doctors: ${nppesResults.length}`);
+    }
+    
+    // FALLBACK: If GPT didn't find anything or verification failed, use traditional NPPES search
+    if (nppesResults.length === 0) {
+      console.log('=== FALLBACK TO TRADITIONAL NPPES SEARCH ===');
+      
+      // Expand specialty search to include related specialties
+      const expandedSpecialties = specialty ? expandSpecialtySearch(specialty) : [specialty].filter(Boolean) as string[];
+      console.log('=== SPECIALTY EXPANSION ===');
+      console.log('Original Specialty:', specialty);
+      console.log('Expanded Specialties:', expandedSpecialties);
+
+      // Attempt 1: Exact match with all parameters (try original specialty first)
+      let searchAttempt = 1;
+      nppesResults = await searchNPPES(
+        extractedName.firstName,
+        extractedName.lastName,
+        specialty,
+        city,
+        state
+      );
+      console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results`);
+      nppesResults = filterActiveNppesResults(nppesResults);
+      
+      // If no results and we have expanded specialties, try them
+      if (nppesResults.length === 0 && expandedSpecialties.length > 1) {
       for (const expandedSpecialty of expandedSpecialties.slice(1)) {
         const expandedResults = await searchNPPES(
           extractedName.firstName,
@@ -1436,7 +1577,7 @@ Only return valid JSON, no other text.`;
         console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results (name + location, no specialty)`);
         nppesResults = filterActiveNppesResults(nppesResults);
       }
-    }
+    } // End of fallback NPPES search
 
     // Enhance with Google Places data
     let physicians: Array<{
