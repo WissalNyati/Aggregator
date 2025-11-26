@@ -8,7 +8,7 @@ import { SearchHistory } from './SearchHistory';
 import { useSEO } from '../hooks/useSEO';
 import { AppointmentBookingCard } from './AppointmentBooking';
 import { ReviewScorecard } from './ReviewScorecard';
-import { normalizeDoctorData, getDoctorSources, extractPracticeInfo, PracticeInfo, DoctorSource } from '../utils/doctorUtils';
+import { normalizeDoctorData, getDoctorSources, extractPracticeInfo } from '../utils/doctorUtils';
 
 interface SearchResult {
   query: string;
