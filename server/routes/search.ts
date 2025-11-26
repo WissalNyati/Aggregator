@@ -2,6 +2,14 @@ import express from 'express';
 import OpenAI from 'openai';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { sql } from '../db/index.js';
+import {
+  advancedNameMatching,
+  enhancedLocationProcessing,
+  expandSpecialtySearch,
+  rankSearchResults,
+  extractNameFromQuery,
+  extractLocationFromQuery,
+} from '../utils/searchUtils.js';
 
 export const searchRoutes = express.Router();
 
@@ -1025,6 +1033,37 @@ searchRoutes.post('/physicians', authenticateToken, async (req: AuthRequest, res
     };
     specialty = parsed.specialty;
     location = normalizeLocationString(parsed.location);
+    
+    // Apply enhanced location processing (fixes "Tukwilla" → "Tukwila")
+    if (location) {
+      location = enhancedLocationProcessing(location);
+    }
+    
+    // Also try extracting from query directly as fallback
+    if (!extractedName.firstName && !extractedName.lastName) {
+      const extractedNameStr = extractNameFromQuery(query);
+      if (extractedNameStr) {
+        const nameParts = extractedNameStr.split(/\s+/);
+        if (nameParts.length >= 2) {
+          extractedName = {
+            firstName: nameParts[0],
+            lastName: nameParts.slice(1).join(' '),
+          };
+        }
+      }
+    }
+    
+    if (!specialty) {
+      // Use local extractSpecialtyFromQuery function
+      specialty = extractSpecialtyFromQuery(query);
+    }
+    
+    if (!location) {
+      location = extractLocationFromQuery(query);
+      if (location) {
+        location = enhancedLocationProcessing(location);
+      }
+    }
 
     console.log('=== PARSED QUERY PARAMETERS ===');
     console.log('Parsed Name:', extractedName);
@@ -1156,7 +1195,13 @@ Only return valid JSON, no other text.`;
     let searchAttempt = 0;
     const maxAttempts = 4;
 
-    // Attempt 1: Exact match with all parameters
+    // Expand specialty search to include related specialties
+    const expandedSpecialties = specialty ? expandSpecialtySearch(specialty) : [specialty].filter(Boolean) as string[];
+    console.log('=== SPECIALTY EXPANSION ===');
+    console.log('Original Specialty:', specialty);
+    console.log('Expanded Specialties:', expandedSpecialties);
+
+    // Attempt 1: Exact match with all parameters (try original specialty first)
     searchAttempt = 1;
     nppesResults = await searchNPPES(
       extractedName.firstName,
@@ -1167,6 +1212,25 @@ Only return valid JSON, no other text.`;
     );
     console.log(`Search attempt ${searchAttempt}: NPPES returned ${nppesResults.length} results`);
     nppesResults = filterActiveNppesResults(nppesResults);
+    
+    // If no results and we have expanded specialties, try them
+    if (nppesResults.length === 0 && expandedSpecialties.length > 1) {
+      for (const expandedSpecialty of expandedSpecialties.slice(1)) {
+        const expandedResults = await searchNPPES(
+          extractedName.firstName,
+          extractedName.lastName,
+          expandedSpecialty,
+          city,
+          state
+        );
+        if (expandedResults.length > 0) {
+          nppesResults = filterActiveNppesResults(expandedResults);
+          specialty = expandedSpecialty; // Update specialty for display
+          console.log(`Found ${nppesResults.length} results with expanded specialty: ${expandedSpecialty}`);
+          break;
+        }
+      }
+    }
 
     // Attempt 2: Remove location constraint if no results
     if (nppesResults.length === 0 && (city || state)) {
@@ -1349,6 +1413,50 @@ Only return valid JSON, no other text.`;
     // Enforce strict location filtering if a location was provided
     if (physicians.length > 0 && (city || state || location)) {
       physicians = filterPhysiciansByLocation(physicians, city, state, location);
+    }
+    
+    // Apply confidence-based ranking with advanced name matching
+    const queryForRanking = {
+      name: extractedName.firstName && extractedName.lastName 
+        ? `${extractedName.firstName} ${extractedName.lastName}` 
+        : extractNameFromQuery(query),
+      specialty: specialty,
+      location: location,
+    };
+    
+    // Add source count and city/state for confidence scoring
+    const physiciansWithMetadata = physicians.map(doctor => {
+      const locationParts = doctor.location.split(',').map(p => p.trim());
+      const doctorCity = locationParts[0] || null;
+      const doctorState = locationParts[1]?.match(/\b([A-Z]{2})\b/)?.[1] || null;
+      
+      return {
+        ...doctor,
+        city: doctorCity,
+        state: doctorState,
+        sourceCount: 1, // Will be enhanced if Google Places data is available
+      };
+    });
+    
+    // Rank by confidence score
+    const rankedPhysicians = rankSearchResults(physiciansWithMetadata, queryForRanking, 60); // Lower threshold for more results
+    
+    // Convert back to original format
+    physicians = rankedPhysicians.map(({ confidence, city: _city, state: _state, sourceCount: _sourceCount, ...doctor }) => doctor);
+    
+    console.log('=== CONFIDENCE RANKING ===');
+    console.log(`Ranked ${physicians.length} physicians by confidence`);
+    if (rankedPhysicians.length > 0) {
+      console.log('Top 3 confidence scores:', rankedPhysicians.slice(0, 3).map(d => ({
+        name: d.name,
+        confidence: d.confidence.total,
+        breakdown: {
+          name: d.confidence.nameScore,
+          specialty: d.confidence.specialtyScore,
+          location: d.confidence.locationScore,
+          bonus: d.confidence.sourceBonus,
+        }
+      })));
     }
 
     // Handle no results with better error messages
