@@ -21,6 +21,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Clear any stale redirect flags on mount
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('auth_redirect_in_progress');
+    }
+
     // AUTHENTICATION REQUIRED - Check auth status on mount
     const checkAuth = async () => {
       setLoading(true);
@@ -35,26 +40,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         
-        // Validate token with backend - use a flag to prevent redirect loops
+        // Validate token with backend - expired tokens will return 401
         try {
           const currentUser = await authApi.getCurrentUser();
           if (currentUser && currentUser.id) {
             setUser(currentUser);
           } else {
+            // Token invalid or expired - already cleared by getCurrentUser
             setUser(null);
-            // Clear invalid token
-            localStorage.removeItem('auth_token');
           }
         } catch (authError) {
-          // For /auth/me endpoint, 401 means invalid token - don't redirect here
-          // The redirect will happen when user tries to access protected routes
+          // For /auth/me endpoint, 401/403 means expired/invalid token
+          // Token is already cleared by apiRequest, just set user to null
           const err = authError as Error & { status?: number; code?: string };
-          if (err.status === 401 && err.code === 'UNAUTHORIZED') {
-            // Token is invalid - clear it but don't redirect (prevent loop)
-            localStorage.removeItem('auth_token');
+          if (err.status === 401 || err.status === 403) {
+            // Token expired/invalid - already cleared, just update state
             setUser(null);
           } else {
-            // Other errors - just clear user
+            // Network or other errors - clear user
             setUser(null);
           }
         }

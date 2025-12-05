@@ -72,39 +72,37 @@ async function apiRequest<T>(
     headers,
   });
 
-  // Handle 401 Unauthorized - but don't redirect for auth endpoints to prevent loops
-  if (response.status === 401) {
+  // Handle 401/403 Unauthorized - expired or invalid tokens
+  if (response.status === 401 || response.status === 403) {
+    // Always clear invalid/expired token immediately
+    removeToken();
+    
     // Don't redirect if we're checking auth status (would cause infinite loop)
     const isAuthEndpoint = endpoint === '/auth/me' || endpoint === '/auth/is-admin';
     
     if (!isAuthEndpoint) {
-      // Clear invalid token
-      removeToken();
-      
-      // Only redirect if we're not already on the auth page and not checking auth
+      // Only redirect if we're not already on the auth page
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {
-        // Use a flag to prevent multiple redirects
+        // Use a flag to prevent multiple redirects - clear any stale flags first
         const redirectKey = 'auth_redirect_in_progress';
-        if (!sessionStorage.getItem(redirectKey)) {
+        const isRedirecting = sessionStorage.getItem(redirectKey);
+        
+        if (!isRedirecting) {
           sessionStorage.setItem(redirectKey, 'true');
           // Store the current path to return after login
           const returnPath = window.location.pathname + window.location.search;
-          window.location.href = `/auth?return=${encodeURIComponent(returnPath)}`;
-          // Clear flag after redirect
-          setTimeout(() => sessionStorage.removeItem(redirectKey), 1000);
+          // Use replace to prevent back button issues
+          window.location.replace(`/auth?return=${encodeURIComponent(returnPath)}`);
         }
       }
-    } else {
-      // For auth endpoints, just clear the token but don't redirect
-      removeToken();
     }
     
-    const errorMessage = 'Authentication required. Please log in.';
+    const errorMessage = 'Your session has expired. Please log in again.';
     const enrichedError = new Error(errorMessage) as Error & {
       status?: number;
       code?: string;
     };
-    enrichedError.status = 401;
+    enrichedError.status = response.status;
     enrichedError.code = 'UNAUTHORIZED';
     throw enrichedError;
   }

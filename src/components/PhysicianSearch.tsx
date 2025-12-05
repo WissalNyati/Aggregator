@@ -468,10 +468,10 @@ export function PhysicianSearch() {
       const err = error as Error & { message?: string; status?: number; code?: string };
       console.error('Search error:', err);
       
-      // Handle 401 - authentication required
-      if (err.status === 401 || err.code === 'UNAUTHORIZED') {
-        // Token invalid - apiRequest will handle redirect
-        // Just show error message
+      // Handle 401/403 - expired or invalid token
+      if (err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED') {
+        // Token expired/invalid - apiRequest will handle redirect
+        // Just show error message briefly before redirect
         if (page === 1) {
           setSearchResults({
             query: query,
@@ -479,7 +479,7 @@ export function PhysicianSearch() {
             location: null,
             results: [],
             resultsCount: 0,
-            error: 'Authentication required. Please log in to search.',
+            error: err.message || 'Your session has expired. Redirecting to login...',
           });
         }
         setSearching(false);

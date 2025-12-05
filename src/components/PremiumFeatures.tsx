@@ -30,19 +30,32 @@ export function PremiumFeatures() {
         const data = await monetizationApi.getSubscription();
         setSubscription(data);
       } catch (error) {
-        const err = error as Error & { status?: number };
+        const err = error as Error & { status?: number; code?: string };
         console.error('Failed to load subscription:', error);
         
-        // Don't crash on 401 - just show free tier
-        if (err.status === 401 || err.status === 403) {
-          // Token invalid - will be handled by apiRequest redirect
-          // Set default free subscription to prevent UI crash
-          setSubscription({
-            id: '',
-            userId: user.id,
-            tier: 'free',
-            features: ['Basic search', 'Limited results (15 per search)', 'Standard booking'],
-          });
+        // Don't crash on 401/403 - token expired/invalid
+        // apiRequest will handle redirect, just show free tier as fallback
+        if (err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED') {
+          // Token expired/invalid - show free tier as fallback
+          // The redirect will happen via apiRequest, but we need to show something
+          if (user) {
+            setSubscription({
+              id: '',
+              userId: user.id,
+              tier: 'free',
+              features: ['Basic search', 'Limited results (15 per search)', 'Standard booking'],
+            });
+          }
+        } else {
+          // Other errors - show free tier as fallback
+          if (user) {
+            setSubscription({
+              id: '',
+              userId: user.id,
+              tier: 'free',
+              features: ['Basic search', 'Limited results (15 per search)', 'Standard booking'],
+            });
+          }
         }
       } finally {
         setLoading(false);

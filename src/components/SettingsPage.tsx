@@ -14,6 +14,7 @@ export function SettingsPage() {
 
   // ProtectedRoute handles redirect, but show loading if user not loaded yet
   // Don't add redirect here to avoid conflicts with ProtectedRoute
+  // If user is null and we're past loading, ProtectedRoute will redirect
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">

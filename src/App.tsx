@@ -54,6 +54,11 @@ function App() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
+    // Clear any stale redirect flags on app initialization
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('auth_redirect_in_progress');
+    }
+
     // Initialize app - don't block on auth
     const initializeApp = async () => {
       try {

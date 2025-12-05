@@ -63,11 +63,14 @@ export function AuthForm() {
           sessionStorage.removeItem('auth_redirect_in_progress');
         }
         
-        // Wait a moment for token to be saved and validated
-        // Then get return path from URL or default to home
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait a moment for token to be saved and AuthContext to update
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Get return path from URL or default to home
         const urlParams = new URLSearchParams(window.location.search);
         const returnPath = urlParams.get('return') || '/';
+        
+        // Use replace to prevent back button issues
         navigate(returnPath, { replace: true });
         // Note: setLoading(false) not needed as navigate will unmount component
       }

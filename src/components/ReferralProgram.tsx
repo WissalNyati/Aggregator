@@ -33,13 +33,23 @@ export function ReferralProgram() {
         const data = await monetizationApi.getReferralStats();
         setStats(data);
       } catch (error) {
-        const err = error as Error & { status?: number };
+        const err = error as Error & { status?: number; code?: string };
         console.error('Failed to load referral stats:', error);
         
-        // Don't crash on 401 - just show empty state
-        if (err.status === 401 || err.status === 403) {
-          // Token invalid - will be handled by apiRequest redirect
-          // Set empty stats to prevent UI crash
+        // Don't crash on 401/403 - token expired/invalid
+        // apiRequest will handle redirect, just show empty state as fallback
+        if (err.status === 401 || err.status === 403 || err.code === 'UNAUTHORIZED') {
+          // Token expired/invalid - show empty state
+          // The redirect will happen via apiRequest, but we need to show something
+          setStats({
+            referralCode: null,
+            referralLink: '',
+            totalReferrals: 0,
+            activeReferrals: 0,
+            rewards: [],
+          });
+        } else {
+          // Other errors - show empty state
           setStats({
             referralCode: null,
             referralLink: '',
