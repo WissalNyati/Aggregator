@@ -21,22 +21,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in - DON'T BLOCK APP LOADING
+    // GUEST MODE BY DEFAULT - DON'T BLOCK APP LOADING
     const checkAuth = async () => {
-      try {
-        // Set loading to false quickly to not block app
-        setLoading(false);
-        
-        // Check auth in background (non-blocking)
-        const currentUser = await authApi.getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
+      // Set loading to false immediately to not block app
+      setLoading(false);
+      
+      // Check auth in background (non-blocking) with delay
+      setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('auth_token');
+          
+          // NO TOKEN = NO AUTH CHECK, PROCEED AS GUEST
+          if (!token || token === 'undefined' || token === 'null' || token.trim() === '') {
+            console.log('No auth token found, proceeding as guest');
+            setUser(null);
+            return;
+          }
+          
+          // SILENT AUTH CHECK - DON'T BLOCK APP
+          const currentUser = await authApi.getCurrentUser();
+          if (currentUser && currentUser.id) {
+            setUser(currentUser);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          // NEVER THROW - just log and continue as guest
+          console.warn('Auth check failed (non-blocking), continuing as guest:', error);
+          setUser(null);
         }
-      } catch (error) {
-        // NEVER THROW - just log and continue
-        console.warn('Auth check failed (non-blocking):', error);
-        setUser(null);
-      }
+      }, 100); // Small delay to ensure app renders first
     };
 
     // Don't wait for auth - set loading to false immediately

@@ -6,6 +6,70 @@ import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { checkBrowserCompatibility, showBrowserIncompatibility } from './utils/browserCheck';
 
+// PREVENT EXTERNAL SCRIPTS FROM BREAKING THE APP
+// Block errors from browser extensions and external scripts
+const blockedScripts = ['draggable.js', 'recorder.js', 'content-script.js', 'adunit', 'chrome-extension'];
+const originalConsoleError = console.error;
+
+// Override console.error to suppress external script errors
+console.error = (...args: any[]) => {
+  const errorMessage = args.map(arg => String(arg)).join(' ');
+  if (blockedScripts.some(script => errorMessage.includes(script))) {
+    // Suppress these errors silently
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
+
+// Block errors from external scripts/extensions
+window.addEventListener('error', (event) => {
+  if (blockedScripts.some(script => event.filename?.includes(script))) {
+    event.preventDefault();
+    console.warn('Blocked external script error:', event.message);
+    return true;
+  }
+  return false;
+}, true);
+
+// Catch unhandled rejections from extensions
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  const errorStack = reason?.stack || String(reason);
+  if (blockedScripts.some(script => errorStack.includes(script))) {
+    event.preventDefault();
+    console.warn('Blocked external promise rejection');
+    return true;
+  }
+  return false;
+});
+
+// Detect and mitigate browser extensions
+const disableProblematicExtensions = () => {
+  // Check for known problematic extensions
+  const problematicSelectors = [
+    '[class*="adunit"]',
+    '[id*="adunit"]',
+    '[src*="draggable.js"]',
+    '[src*="recorder.js"]',
+  ];
+  
+  problematicSelectors.forEach(selector => {
+    try {
+      document.querySelectorAll(selector).forEach(el => {
+        (el as HTMLElement).style.display = 'none';
+        el.remove();
+      });
+    } catch (e) {
+      // Silent fail
+    }
+  });
+};
+
+// Call on app start
+if (typeof window !== 'undefined') {
+  disableProblematicExtensions();
+}
+
 // Debug logging
 console.log('🚀 App Starting...');
 console.log('Build Environment:', import.meta.env.MODE);

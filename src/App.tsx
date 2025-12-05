@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AuthForm } from './components/AuthForm';
 import { PhysicianSearch } from './components/PhysicianSearch';
@@ -9,20 +9,19 @@ import { SettingsPage } from './components/SettingsPage';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   // Don't block on loading - show content immediately
   // Auth check happens in background
+  // ALLOW GUEST ACCESS - Don't redirect if no user
   if (loading) {
     // Show content with minimal delay
     return <>{children}</>;
   }
 
-  // If no user after loading, redirect to home (which will show auth form)
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
-
+  // GUEST MODE: Allow access even without user
+  // Only redirect for truly protected routes (like analytics)
+  // For now, allow all routes in guest mode
   return <>{children}</>;
 }
 
@@ -47,8 +46,8 @@ function App() {
     // Initialize app - don't block on auth
     const initializeApp = async () => {
       try {
-        // Small delay to ensure everything is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Very small delay to ensure everything is ready
+        await new Promise(resolve => setTimeout(resolve, 50));
         setAppReady(true);
       } catch (error) {
         console.error('App initialization error:', error);
@@ -60,15 +59,35 @@ function App() {
     void initializeApp();
   }, []);
 
-  // Show loading state
+  // Show loading state with better UI
   if (!appReady) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <div className="text-center glass-card rounded-3xl p-12 shadow-professional-lg">
-          <div className="spinner-professional mx-auto mb-6" />
-          <h2 className="text-heading text-xl mb-2">Loading YoDoc...</h2>
-          <p className="text-body text-sm">Healthcare search platform</p>
-        </div>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+      }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          border: '4px solid rgba(255,255,255,0.3)',
+          borderTop: '4px solid white',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '20px'
+        }}></div>
+        <h2 style={{ marginBottom: '10px', fontSize: '1.5rem', fontWeight: 600 }}>YoDoc Healthcare Search</h2>
+        <p style={{ opacity: 0.8, fontSize: '0.875rem' }}>Initializing application...</p>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }

@@ -134,22 +134,38 @@ export const authApi = {
   },
 
   async getCurrentUser() {
+    // SILENT AUTH CHECK - DON'T THROW ERRORS
     try {
+      const token = getToken();
+      
+      // NO TOKEN = NO AUTH CHECK, RETURN NULL IMMEDIATELY
+      if (!token || token === 'undefined' || token === 'null' || token.trim() === '') {
+        return null;
+      }
+      
+      // SILENT AUTH CHECK - DON'T BLOCK APP
       const user = await apiRequest<{ id: string; email: string }>('/auth/me');
+      
+      // If response indicates guest mode, return null
+      if (!user || !user.id) {
+        removeToken();
+        return null;
+      }
+      
       return user;
     } catch (error) {
       const err = error as Error & { status?: number };
       
       // NEVER THROW ERRORS - ALWAYS RETURN NULL TO PREVENT APP CRASHES
-      // Handle 401 Unauthorized - token expired or invalid
-      if (err.status === 401) {
-        console.warn('Auth token expired or invalid');
+      // Handle all error cases silently
+      if (err.status === 401 || err.status === 403) {
+        console.warn('Auth token expired or invalid, continuing as guest');
         removeToken();
         return null;
       }
       
-      // All other errors (502, 500, network errors, etc.) - just return null
-      console.warn('Auth service unavailable:', err.message || 'Unknown error');
+      // All other errors (502, 500, network errors, etc.) - just return null silently
+      console.warn('Auth service unavailable, continuing as guest:', err.message || 'Unknown error');
       return null;
     }
   },
