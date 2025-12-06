@@ -100,9 +100,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="dns-prefetch" href="https://yodoc.netlify.app">
     
-    <!-- Google Maps API -->
-    <!-- Note: Google Maps API key is public (restricted by domain in Google Cloud Console) -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyApB1WFImceb9CiYETwk7tTverYcgSiKls&libraries=places,geometry" async defer></script>
+    <!-- Google Maps API will be loaded dynamically via loadGoogleMaps utility -->
+    <!-- API key is stored in environment variable VITE_GOOGLE_MAPS_API_KEY -->
     
   </head>
   <body>

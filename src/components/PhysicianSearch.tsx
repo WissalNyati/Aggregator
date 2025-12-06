@@ -13,6 +13,7 @@ import { ReviewScorecard } from './ReviewScorecard';
 import { normalizeDoctorData, getDoctorSources, extractPracticeInfo } from '../utils/doctorUtils';
 import { useAuth } from '../context/AuthContext';
 import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
+import { loadGoogleMaps } from '../utils/loadGoogleMaps';
 
 interface SearchResult {
   query: string;
@@ -438,17 +439,19 @@ function MapIntegration({ doctors, selectedDoctorNpi, onDoctorSelect }: MapInteg
     index: number;
   }>>([]);
 
-  // Check if Google Maps is loaded
+  // Load Google Maps dynamically
   useEffect(() => {
-    const checkGoogleMaps = () => {
-      if (typeof window !== 'undefined' && window.google && window.google.maps) {
-        setIsGoogleMapsLoaded(true);
-        geocoderRef.current = new window.google.maps.Geocoder();
-      } else {
-        setTimeout(checkGoogleMaps, 100);
-      }
-    };
-    checkGoogleMaps();
+    loadGoogleMaps()
+      .then(() => {
+        if (typeof window !== 'undefined' && window.google && window.google.maps) {
+          setIsGoogleMapsLoaded(true);
+          geocoderRef.current = new window.google.maps.Geocoder();
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load Google Maps:', error);
+        // Maps will not be available, but app can still function
+      });
   }, []);
 
   // Geocode addresses when Google Maps is loaded

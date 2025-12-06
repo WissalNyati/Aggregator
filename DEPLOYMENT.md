@@ -114,12 +114,17 @@ Go to **Site settings** → **Environment variables** and add:
 ```bash
 # Backend API URL (use your Railway URL from Step 4 above)
 VITE_API_URL=https://your-app-name.up.railway.app/api
+
+# Google Maps API Key (for interactive maps)
+VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 ```
 
 **Important**: 
 - Use your Railway backend URL
 - Make sure it ends with `/api`
 - Use `https://` (not `http://`)
+- Get Google Maps API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+- Restrict the API key to your Netlify domain in Google Cloud Console for security
 
 ### Step 4: Update netlify.toml (Optional)
 
@@ -292,6 +297,7 @@ STRIPE_PREMIUM_PRODUCT_ID (for subscriptions)
 ### Netlify Environment Variables (Frontend)
 ```
 VITE_API_URL=https://your-railway-url.up.railway.app/api
+VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 ```
 
 ---
