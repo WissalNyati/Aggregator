@@ -1,14 +1,28 @@
-// Simplified API Proxy - Hardcoded backend URL to eliminate env issues
-const BACKEND_BASE_URL = 'https://physician-search-api-production.up.railway.app';
+// API Proxy - Uses environment variable for backend URL
+// Get backend URL from environment variable (VITE_API_URL), remove /api suffix if present
+const getBackendBaseUrl = () => {
+  const apiUrl = process.env.VITE_API_URL || '';
+  if (apiUrl) {
+    // Remove /api suffix if present
+    return apiUrl.replace(/\/api\/?$/, '');
+  }
+  // Fallback to empty string - will cause error which is better than wrong URL
+  console.warn('[api-proxy] VITE_API_URL not set, using fallback');
+  return '';
+};
+
+const BACKEND_BASE_URL = getBackendBaseUrl();
 
 exports.handler = async (event) => {
   console.log('[api-proxy] Called:', event.httpMethod, event.queryStringParameters?.path);
 
-  // CORS headers
+  // CORS headers - support credentials for cookie-based auth
+  const requestOrigin = event.headers.origin || event.headers.Origin || '*';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Origin': requestOrigin,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true', // Required for cookies
   };
 
   // Handle CORS preflight
@@ -67,6 +81,12 @@ exports.handler = async (event) => {
       options.headers['Authorization'] = authHeader;
     }
 
+    // CRITICAL: Forward cookies from client request to backend
+    const cookieHeader = event.headers.cookie || event.headers.Cookie;
+    if (cookieHeader) {
+      options.headers['Cookie'] = cookieHeader;
+    }
+
     // Add body for non-GET requests
     if (event.body && event.httpMethod !== 'GET') {
       options.body = event.body;
@@ -94,13 +114,22 @@ exports.handler = async (event) => {
         data = await response.text();
       }
 
+      // CRITICAL: Forward Set-Cookie headers from backend response to client
+      const setCookieHeader = response.headers.get('set-cookie');
+      const responseHeaders = {
+        ...corsHeaders,
+        'Content-Type': contentType || 'application/json',
+      };
+
+      // Forward Set-Cookie header if present (for authentication cookies)
+      if (setCookieHeader) {
+        responseHeaders['Set-Cookie'] = setCookieHeader;
+      }
+
       // Return successful response
       return {
         statusCode: response.status,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': contentType || 'application/json',
-        },
+        headers: responseHeaders,
         body: typeof data === 'string' ? data : JSON.stringify(data),
       };
     } catch (fetchError) {
